@@ -116,15 +116,16 @@ In plain words: everything heavy (the math, the data, the map) happens in the us
 
 ## Team Division (2 people)
 
-| Lane | 🅰 You — App, UI, AI, data ops | 🅱 Teammate — Data, Analytics, QA |
-|---|---|---|
-| **Phase 0** | ALL of it — but he **starts 1.1 immediately**, not after Phase 0 | — (jumps straight to 1.1 the moment you scaffold) |
+| Lane        | 🅰 You — App, UI, AI, data ops                                                                                       | 🅱 Teammate — Data, Analytics, QA                                                        |
+| ----------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| **Phase 0** | ALL of it — but he **starts 1.1 immediately**, not after Phase 0                                                     | — (jumps straight to 1.1 the moment you scaffold)                                        |
 | **Phase 1** | Contract (types + stubs) → 1.3 map → 1.4 dashboard → 1.5 investigation → 1.6 AI investigator → then 1.7/1.8 together | 1.1 generator (Python) → 1.2 anomaly engine (fills your stubs) → validator + smoke tests |
-| **Phase 2** | 2.1/2.3 demo dry-runs + pitch · 2.4 Vercel env & keys | 2.2 README draft · build/preview QA · 2.4 redeploy re-test |
+| **Phase 2** | 2.1/2.3 demo dry-runs + pitch · 2.4 Vercel env & keys                                                                | 2.2 README draft · build/preview QA · 2.4 redeploy re-test                               |
 
 **Why this split:** He thinks in "pure function → JSON out" terms (his backend instinct), so every task in his lane is exactly that — no UI, no AI-agent concepts, no prompt engineering. The analytical truth (engine + data) is his; the AI that explains it is yours. His "done" is always machine-checkable — you review by running a script, not by reading his code.
 
 **Handoff contract (write this FIRST, ~30 min, before he starts 1.2):**
+
 1. `src/lib/types.ts` — `Claim` / `Factor` / engine input-output types. He codes against these names exactly.
 2. `src/analytics/*.ts` stub files — you provide the function signatures + empty bodies, he fills the logic.
 3. `data/README.md` (your Phase 0 output) — the exact district names/codes from the GeoJSON conversion; he keys synthetic claims to those names, not invented ones.
