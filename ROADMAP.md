@@ -1,6 +1,6 @@
 # FRA Intelligence & Decision Support Platform — Hackathon ROADMAP
 
-> **How to use this file:** This is our single source of truth for the hackathon. Work through it **in order** — each phase and subphase is written top-to-bottom in the order you should build it. When you finish a task, **tick its checkbox**. Every checkbox is one small task you can finish in one sitting. Tasks marked 🅰 / 🅱 / ⚡ are the ones that can run **in parallel between the two of us** — everything else is strictly linear (don't jump ahead). Decisions made in this file are final — don't re-debate them at 3 AM.
+> **How to use this file:** This is our single source of truth for the hackathon. Work through it **in order** — each phase and subphase is written top-to-bottom in the order you should build it. When you finish a task, **tick its checkbox**. Every checkbox is one small task you can finish in one sitting. Task markers: 🅰 = **you** (app / UI / AI / data ops) · 🅱 = **teammate** (data / analytics / QA) · ⚡ = **together**. 🅱 tasks can run fully in parallel with your 🅰 lane once the handoff contract exists (see Team Division) — everything else is strictly linear (don't jump ahead). Decisions made in this file are final — don't re-debate them at 3 AM.
 >
 > ⏱️ ~10.5 hours remain. Phase 0 = ~1 h · Phase 1 = ~7 h · Phase 2 = ~2 h.
 
@@ -114,16 +114,37 @@ In plain words: everything heavy (the math, the data, the map) happens in the us
 
 ---
 
-## Phase 0 — Foundation (~1 h)
+## Team Division (2 people)
 
-**Goal:** Repo live on GitHub and Vercel, both datasets committed, skeleton app running for both of us.
+| Lane | 🅰 You — App, UI, AI, data ops | 🅱 Teammate — Data, Analytics, QA |
+|---|---|---|
+| **Phase 0** | ALL of it — but he **starts 1.1 immediately**, not after Phase 0 | — (jumps straight to 1.1 the moment you scaffold) |
+| **Phase 1** | Contract (types + stubs) → 1.3 map → 1.4 dashboard → 1.5 investigation → 1.6 AI investigator → then 1.7/1.8 together | 1.1 generator (Python) → 1.2 anomaly engine (fills your stubs) → validator + smoke tests |
+| **Phase 2** | 2.1/2.3 demo dry-runs + pitch · 2.4 Vercel env & keys | 2.2 README draft · build/preview QA · 2.4 redeploy re-test |
+
+**Why this split:** He thinks in "pure function → JSON out" terms (his backend instinct), so every task in his lane is exactly that — no UI, no AI-agent concepts, no prompt engineering. The analytical truth (engine + data) is his; the AI that explains it is yours. His "done" is always machine-checkable — you review by running a script, not by reading his code.
+
+**Handoff contract (write this FIRST, ~30 min, before he starts 1.2):**
+1. `src/lib/types.ts` — `Claim` / `Factor` / engine input-output types. He codes against these names exactly.
+2. `src/analytics/*.ts` stub files — you provide the function signatures + empty bodies, he fills the logic.
+3. `data/README.md` (your Phase 0 output) — the exact district names/codes from the GeoJSON conversion; he keys synthetic claims to those names, not invented ones.
+4. His "done" = both pass: `python3 scripts/py/validate_data.py` AND `npx tsx scripts/smoke-engine.ts`.
+
+**Sequence:** You run Phase 0 (~1 h, alone) while he writes the generator against the `Claim` schema in section 1.1. When Phase 0 ends: you drop the contract (types + stubs, ~30 min) → he runs 1.2 + validators while you build 1.3 → 1.5 (UI shell needs no real data to start; wire real engine output at first integration). Then 1.7 + 1.8 together. One rule: never both edit the same file in the same hour — check with each other before touching `types.ts`.
+
+---
+
+## Phase 0 — Foundation (~1 h) — 🅰 yours
+
+**Goal:** Repo live on GitHub and Vercel, both datasets committed, skeleton app running. Teammate starts 1.1 in parallel.
 
 - [ ] **Scaffold the app** — `npm create vite@latest . -- --template react-ts`, then `npm install`, commit, push to GitHub
 - [ ] **Wire Tailwind v4** — `npm install tailwindcss @tailwindcss/vite`, add the plugin, and replace `src/index.css` with `@import "tailwindcss";`
 - [ ] **Import the repo into Vercel** (framework preset: Vite) — deploy the empty shell now so deployment is never a "surprise" later
-- [ ] 🅰 **Convert India GeoJSON** — download states + districts shapefiles from datameet, convert + simplify, commit to `data/` (commands below)
-- [ ] 🅱 **Create `data/state-stats.json`** — hardcode the real state numbers from the table below + national totals + source URL
+- [ ] **Convert India GeoJSON** — download states + districts shapefiles from datameet, convert + simplify, commit to `data/` (commands below)
+- [ ] **Create `data/state-stats.json`** — hardcode the real state numbers from the table below + national totals + source URL
 - [ ] **Skeleton views** — one page with an empty map area, a side panel placeholder, and a claims list placeholder, so 1.3–1.7 have somewhere to plug in
+- [ ] **Write `data/README.md`** — the exact district names/codes from the conversion + the claim-data schema; this is teammate's keying contract for 1.1
 
 ### Phase 0 reference
 
@@ -186,7 +207,7 @@ ogr2ogr -f GeoJSON data/districts.geojson Districts/Census_2011/2011_Dist.shp
 
 **Goal:** The full loop — Monitor → Detect → Investigate → Explain → Prioritize — works end-to-end without touching the data by hand.
 
-**Build order:** 1.1 → 1.2 first (strictly linear — the engine needs the data shape). After 1.2 exists, split: 🅰 takes 1.3 → 1.4 → 1.5 (all UI) while 🅱 takes 1.6 → 1.7 (AI + queue). Both converge on 1.8.
+**Build order:** Phase 0 is yours alone (teammate starts 1.1 immediately — the `Claim` schema lives in this file). When Phase 0 ends, you drop the handoff contract (types + engine stubs, ~30 min), then run your UI lane 1.3 → 1.4 → 1.5 while teammate does 1.1 → 1.2 + validators. Both converge on 1.7 → 1.8.
 
 ---
 
@@ -196,11 +217,13 @@ ogr2ogr -f GeoJSON data/districts.geojson Districts/Census_2011/2011_Dist.shp
 
 **Why:** If the anomaly engine and the UI both read one committed JSON file with one agreed shape, they never disagree, and the demo works offline.
 
-- [ ] Define the `Claim` TypeScript type (schema below) in `src/lib/types.ts`
-- [ ] Write `scripts/generate-data.ts` with a **seeded RNG** (same seed → same data every time)
-- [ ] Generate ~300–800 claims across ~10 districts of one demo state, so charts look real but load instantly
-- [ ] Embed the 5 scenarios: A (one district with slow DLC stage) · B (claims with area mismatch >30%) · C (duplicate pairs with slight spelling drift) · D (a tight geo-cluster in one tehsil) · E (**one hero claim carrying all signals**, in a designated hero district)
-- [ ] Commit `data/generated/claims.json` — no runtime fetching, ever
+- [ ] 🅰 Define the `Claim` TypeScript type (schema below) in `src/lib/types.ts` — the handoff contract
+- [ ] 🅱 Write `scripts/py/generate_data.py` — **Python is fine here**: this script never ships, its output does. Seed it (`random.Random(1337)`) so regeneration is identical
+- [ ] 🅱 Build realistic name pools (claimants, villages, gram panchayats, forest ranges) for the demo districts
+- [ ] 🅱 Generate ~300–800 claims across ~10 districts of one demo state, so charts look real but load instantly
+- [ ] 🅱 Embed the 5 scenarios: A (one district with slow DLC stage) · B (claims with area mismatch >30%) · C (duplicate pairs with slight spelling drift) · D (a tight geo-cluster in one tehsil) · E (**one hero claim carrying all signals**, in a designated hero district)
+- [ ] 🅱 Write `scripts/py/validate_data.py` — schema check, chronological stages, scenario A–E presence — and run it before committing
+- [ ] 🅱 Commit `data/generated/claims.json` — no runtime fetching, ever
 
 ```ts
 // src/lib/types.ts — the claim shape (mirrors real FRA Form A fields)
@@ -254,20 +277,23 @@ export function mulberry32(seed: number) {
 }
 ```
 
+> 🅱 **Python note** — one line does the same job: `rng = random.Random(1337)`; derive every random value from `rng.random()`. Output field names must match the `Claim` type above EXACTLY — `validate_data.py` enforces it.
+
 ---
 
-### 1.2 — Anomaly engine (🅱, ~1.5 h)
+### 1.2 — Anomaly engine (stubs 🅰 · implementation 🅱, ~1.5 h)
 
 **What:** A pure-TypeScript module (`src/analytics/`) that reads claims and emits anomaly signals + one explainable risk score. No ML, no training — four deterministic detectors, each a short function.
 
 **Why:** "Analytical truth outside the LLM" is the core architecture decision. The AI only _explains_ what this module already proved.
 
-- [ ] `processing.ts` — per-stage durations vs district baseline (IQR), per district. Flags "statistically unusual processing time", never "overdue"
-- [ ] `consistency.ts` — land mismatch: `|areaClaimedHa − areaInRecordHa| / areaInRecordHa > 0.3` → flag with both values
-- [ ] `duplicates.ts` — block on `village + khasraNo`, then Jaccard ≥ 0.85 on token union of name fields; also flag the trivial case: same khasra claimed by >1 claimant
-- [ ] `spatial.ts` — count claims per 0.25°×0.25° grid cell; flag cells in the top decile; also rank districts by anomaly-claim density
-- [ ] `score.ts` — weighted combine into `0..1` risk score, keeping a **per-signal factor list** (the UI renders this list as the "why flagged?" panel — no recompute, no AI)
-- [ ] Smoke-test: a tiny script asserting each scenario A–E actually produces its expected flag
+- [ ] 🅰 Stub the contract in `src/lib/types.ts` + `src/analytics/*.ts`: exact function signatures, input/output types, empty bodies — teammate fills the logic against it
+- [ ] 🅱 `processing.ts` — per-stage durations vs district baseline (IQR), per district. Flags "statistically unusual processing time", never "overdue"
+- [ ] 🅱 `consistency.ts` — land mismatch: `|areaClaimedHa − areaInRecordHa| / areaInRecordHa > 0.3` → flag with both values
+- [ ] 🅱 `duplicates.ts` — block on `village + khasraNo`, then Jaccard ≥ 0.85 on token union of name fields; also flag the trivial case: same khasra claimed by >1 claimant
+- [ ] 🅱 `spatial.ts` — count claims per 0.25°×0.25° grid cell; flag cells in the top decile; also rank districts by anomaly-claim density
+- [ ] 🅱 `score.ts` — weighted combine into `0..1` risk score, keeping a **per-signal factor list** (the UI renders this list as the "why flagged?" panel — no recompute, no AI)
+- [ ] 🅱 `scripts/smoke-engine.ts` (run with `npx tsx` — add `tsx` as a dev dependency) — asserts each scenario A–E produces its expected flag; his machine-checkable "done"
 
 ```ts
 // processing.ts — IQR outlier threshold (robust to the heavy tail of delays)
@@ -376,7 +402,7 @@ import { riskColor, districtRisk } from "../analytics/score";
 
 ---
 
-### 1.6 — AI investigator (🅱, ~1 h)
+### 1.6 — AI investigator (🅰, ~1 h)
 
 **What:** One Vercel serverless function that receives the claim's structured evidence JSON and returns a structured narrative (findings, reasoning, confidence, limitations, open questions). Gemini free tier.
 
@@ -479,7 +505,7 @@ export default async function handler(req: Request) {
 - [ ] Map our features to the 5 judging pillars (table above) so answers are instant
 - [ ] Pre-answer the hard questions: "Is this real data?" (hybrid — state numbers real, claims synthetic) · "Did the AI make that up?" (no — evidence JSON only) · "Why not real-time?" (out of scope, 12-hour build)
 
-### 2.4 — Deploy hardening (🅱, ~15 min)
+### 2.4 — Deploy hardening (⚡, ~15 min)
 
 - [ ] Set `GEMINI_API_KEY` in Vercel env (restricted key), redeploy, re-test the AI button
 - [ ] Verify the fallback path once by deliberately breaking the key (then restore)
@@ -531,7 +557,10 @@ averis-fra/
 ├── api/
 │   └── investigate.ts           # the ONLY server code: LLM proxy (Gemini)
 ├── scripts/
-│   └── generate-data.ts         # seeded synthetic data generator (run once, commit output)
+│   ├── py/
+│   │   ├── generate_data.py     # 🅱 synthetic data generator — Python (never ships, output is committed JSON)
+│   │   └── validate_data.py     # 🅱 schema/scenario validator — his machine-checkable "done"
+│   └── smoke-engine.ts          # 🅱 engine smoke test (npx tsx) — scenarios A–E produce their flags
 ├── data/
 │   ├── states.geojson           # converted from datameet (CC BY 4.0)
 │   ├── districts.geojson        # Census 2011 (CC BY 4.0)
@@ -551,7 +580,7 @@ averis-fra/
     └── App.tsx                  # routing between views (map ⇄ investigation)
 ```
 
-**Key dependencies (pinned):** `react@19` · `react-leaflet@5.0.0` · `leaflet@1.9.4` · `tailwindcss@4` (+ `@tailwindcss/vite`) · `recharts` · `zod` (AI output validation).
+**Key dependencies (pinned):** `react@19` · `react-leaflet@5.0.0` · `leaflet@1.9.4` · `tailwindcss@4` (+ `@tailwindcss/vite`) · `recharts` · `zod` (AI output validation) · `tsx` (dev only — runs engine smoke test).
 
 ## Key References
 
