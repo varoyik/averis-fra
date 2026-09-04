@@ -1,0 +1,112 @@
+{
+  "source": {
+    "title": "State-wise FRA claim figures — Lok Sabha answer, 23 Jul 2026",
+    "url": "https://sansad.in/getFile/lsapps/loksabhaquestions/annex/188/AU756_yijOS0.pdf",
+    "asOf": "2026-06-30",
+    "note": "Official Ministry of Tribal Affairs STATE-level figures. District-level numbers do not exist officially — district/claim data is synthetic (see generated/claims.json)."
+  },
+  "national": {
+    "claimsReceived": 5401561,
+    "titlesGranted": 2542359,
+    "rejected": 1813232,
+    "pending": 1045970
+  },
+  "states": [
+    {
+      "name": "Andhra Pradesh",
+      "id": "andhra-pradesh",
+      "claimsReceived": 288409,
+      "titlesGranted": 228489,
+      "rejected": 58395,
+      "pending": 1525
+    },
+    {
+      "name": "Assam",
+      "id": "assam",
+      "claimsReceived": 216644,
+      "titlesGranted": 87436,
+      "rejected": 16379,
+      "pending": 112829
+    },
+    {
+      "name": "Chhattisgarh",
+      "id": "chhattisgarh",
+      "claimsReceived": 947479,
+      "titlesGranted": 534068,
+      "rejected": 406787,
+      "pending": 6624
+    },
+    {
+      "name": "Gujarat",
+      "id": "gujarat",
+      "claimsReceived": 190242,
+      "titlesGranted": 103524,
+      "rejected": 2331,
+      "pending": 84387
+    },
+    {
+      "name": "Jharkhand",
+      "id": "jharkhand",
+      "claimsReceived": 110756,
+      "titlesGranted": 61970,
+      "rejected": 28107,
+      "pending": 20679
+    },
+    {
+      "name": "Karnataka",
+      "id": "karnataka",
+      "claimsReceived": 295176,
+      "titlesGranted": 16700,
+      "rejected": 262626,
+      "pending": 15850
+    },
+    {
+      "name": "Kerala",
+      "id": "kerala",
+      "claimsReceived": 45598,
+      "titlesGranted": 29807,
+      "rejected": 13216,
+      "pending": 2575
+    },
+    {
+      "name": "Madhya Pradesh",
+      "id": "madhya-pradesh",
+      "claimsReceived": 807405,
+      "titlesGranted": 289461,
+      "rejected": 244487,
+      "pending": 273457
+    },
+    {
+      "name": "Maharashtra",
+      "id": "maharashtra",
+      "claimsReceived": 409156,
+      "titlesGranted": 208335,
+      "rejected": 172631,
+      "pending": 28190
+    },
+    {
+      "name": "Odisha",
+      "id": "odisha",
+      "claimsReceived": 769977,
+      "titlesGranted": 473936,
+      "rejected": 146345,
+      "pending": 149696
+    },
+    {
+      "name": "Rajasthan",
+      "id": "rajasthan",
+      "claimsReceived": 118375,
+      "titlesGranted": 51766,
+      "rejected": 65921,
+      "pending": 688
+    },
+    {
+      "name": "Telangana",
+      "id": "telangana",
+      "claimsReceived": 655249,
+      "titlesGranted": 231456,
+      "rejected": 94426,
+      "pending": 329367
+    }
+  ]
+}

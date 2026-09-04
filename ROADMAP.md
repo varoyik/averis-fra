@@ -139,13 +139,13 @@ In plain words: everything heavy (the math, the data, the map) happens in the us
 
 **Goal:** Repo live on GitHub and Vercel, both datasets committed, skeleton app running. Teammate starts 1.1 in parallel.
 
-- [ ] **Scaffold the app** — `npm create vite@latest . -- --template react-ts`, then `npm install`, commit, push to GitHub
-- [ ] **Wire Tailwind v4** — `npm install tailwindcss @tailwindcss/vite`, add the plugin, and replace `src/index.css` with `@import "tailwindcss";`
-- [ ] **Import the repo into Vercel** (framework preset: Vite) — deploy the empty shell now so deployment is never a "surprise" later
-- [ ] **Convert India GeoJSON** — download states + districts shapefiles from datameet, convert + simplify, commit to `data/` (commands below)
-- [ ] **Create `data/state-stats.json`** — hardcode the real state numbers from the table below + national totals + source URL
+- [x] **Scaffold the app** — `npm create vite@latest . -- --template react-ts`, then `npm install`, commit, push to GitHub
+- [x] **Wire Tailwind v4** — `npm install tailwindcss @tailwindcss/vite`, add the plugin, and replace `src/index.css` with `@import "tailwindcss";`
+- [x] **Import the repo into Vercel** (framework preset: Vite) — deploy the empty shell now so deployment is never a "surprise" later
+- [x] **Convert India GeoJSON** — download states + districts shapefiles from datameet, convert + simplify, commit to `data/` (commands below)
+- [x] **Create `data/state-stats.json`** — hardcode the real state numbers from the table below + national totals + source URL
 - [ ] **Skeleton views** — one page with an empty map area, a side panel placeholder, and a claims list placeholder, so 1.3–1.7 have somewhere to plug in
-- [ ] **Write `data/README.md`** — the exact district names/codes from the conversion + the claim-data schema; this is teammate's keying contract for 1.1
+- [x] **Write `data/README.md`** — the exact district names/codes from the conversion + the claim-data schema; this is teammate's keying contract for 1.1. Must also include: **datameet attribution (CC BY 4.0 + the MIT / CC BY 2.5 India discrepancy)** and the keying rules from the conversion notes (district `id` = 5-digit census code, state `id` = name slug).
 
 ### Phase 0 reference
 
@@ -165,21 +165,27 @@ export default defineConfig({ plugins: [react(), tailwindcss()] });
 @import "tailwindcss";
 ```
 
-**GeoJSON conversion** (one-time, ~15 min, never again):
+**GeoJSON conversion** (one-time, ~15 min, never again — DONE, `data/states.geojson` + `data/districts.geojson`, commit `4ac4703`):
 
 ```bash
-# 1. Download from https://github.com/datameet/maps
+# 1. Download from https://github.com/datameet/maps (branch: master) — use jsDelivr if raw.githubusercontent is slow:
 #    States/Admin2.shp (36 records: 28 states + 8 UTs)
 #    Districts/Census_2011/2011_Dist.shp (641 districts, Census 2011 names)
+#    each .shp needs its companion .shx/.dbf/.prj in the same dir (no .cpg for districts — fine)
 
-# 2. Convert (needs gdal/ogr2ogr) — or use mapshaper.org (drag zipped .shp → simplify → export GeoJSON)
-ogr2ogr -f GeoJSON data/states.geojson States/Admin2.shp
-ogr2ogr -f GeoJSON data/districts.geojson Districts/Census_2011/2011_Dist.shp
+# 2. Convert + simplify with the mapshaper CLI (npx — no gdal/ogr2ogr needed):
+npx mapshaper States/Admin2.shp -filter-fields ST_NM -simplify 5% -o precision=0.001 data/states.geojson
+npx mapshaper Districts/Census_2011/2011_Dist.shp -filter-fields ST_CEN_CD,DT_CEN_CD,DISTRICT,ST_NM -simplify 12% -o precision=0.001 data/districts.geojson
 
-# 3. Simplify to keep each file under ~2 MB (mapshaper: "simplify 20%" / ogr2ogr -simplify)
+# 3. Both files are under ~2 MB (states 884 KB, districts 1.77 MB). No ogr2ogr needed on this machine.
 ```
 
 > ⚠️ **Known gotchas (already researched — don't rediscover):** datameet ships **shapefiles, not GeoJSON**; district names are **Census 2011** (so Telangana is still inside Andhra Pradesh, 641 districts not ~785); license is **CC BY 4.0 — attribution required in README**. Key our synthetic data to the **exact district names we ship** and keep a small alias map for spelling variants. Use census codes (`ST_CEN_CD`, `DT_CEN_CD`) as ids, not display names.
+
+> 📌 **Verified during conversion (ship keys, don't re-derive):**
+> - **`states.geojson` has NO census codes** — `Admin2.shp` is **post-2019** (36 units: Telangana + Ladakh separate, D&NH + Daman & Diu merged into one UT), while `districts.geojson` is **Census 2011** (641 districts, Telangana inside AP, Ladakh inside J&K). The layers' `ST_NM` values therefore do NOT match 1:1 (e.g. districts spell "Arunanchal Pradesh", "NCT of Delhi", "Andaman & Nicobar Island"). **Keying: districts by `id` = padded `ST_CEN_CD`(2)+`DT_CEN_CD`(3) (5-digit census code); states by `id` = name slug** (`arunachal-pradesh`, …). Consequences: clicking Telangana (or Ladakh) on the map will show districts labeled Andhra Pradesh (or J&K) — handle in 1.3; join state KPIs by `ST_NM`/slug, never by state census code (none exists for the 3 post-2019 units).
+> - **License is ambiguous in datameet**: repo-root `LICENSE` = MIT, `Districts/README.md` = CC BY 2.5 India, repo README = CC BY 4.0. Attribute **CC BY 4.0** (per repo README) and disclose the discrepancy in `data/README.md` (task 7).
+> - mapshaper `-simplify` reports unrepaired intersections (279 states / 1,182 districts) — normal for shared borders; invisible at choropleth stroke weight, no action needed.
 
 **Real official state numbers** — hardcode these (source: Lok Sabha answer, 23 Jul 2026, data as of 30.06.2026, `https://sansad.in/getFile/lsapps/loksabhaquestions/annex/188/AU756_yijOS0.pdf`):
 
@@ -538,7 +544,7 @@ natural-language investigation · evidence/source drawer · explainable risk dec
 | **Gemini rejects the API key**                          | Unrestricted keys have been rejected since 19 Jun 2026 — a brand-new key fails mysteriously    | Create a project-restricted key; keep Groq as backup; template fallback renders the evidence regardless                             |
 | **AI quota exhausted mid-demo**                         | Free tier ≈ 10 req/min; a judge re-clicking the button could hit it                            | Pre-warm/cache the hero narrative; template fallback means the demo never hangs                                                     |
 | **Campus Wi-Fi dies**                                   | Everything is static EXCEPT the AI call + map tiles                                            | Choropleth renders without tiles (plain background); local `vite preview` as plan B; AI degrades to template                        |
-| **GeoJSON rabbit hole**                                 | datameet is shapefile-first, 641 Census-2011 districts, Telangana inside AP, ~16 MB shapefiles | One-time `ogr2ogr` + mapshaper in Phase 0 (budget 15 min, already scripted above); key data to shipped names; census-code ids       |
+| **GeoJSON rabbit hole**                                 | datameet is shapefile-first, 641 Census-2011 districts, Telangana inside AP, ~16 MB shapefiles | One-time `npx mapshaper` CLI in Phase 0 (done — see conversion notes above); key data to shipped names; census-code ids for districts, name slugs for states |
 | **react-leaflet breaks at install**                     | v5 requires React 19; Leaflet's default marker icons break under bundlers                      | Pin `react-leaflet@5` + `leaflet@1.9.4` + React 19; use choropleth/`circleMarker`/`divIcon` only; import `leaflet/dist/leaflet.css` |
 | **Anomaly engine becomes "ML"**                         | Temptation to add sklearn-style magic eats hours and violates the no-training scope            | Locked: IQR + Jaccard + grid binning + weighted score only; smoke tests assert scenarios A–E                                        |
 | **Risk score looks arbitrary**                          | A bare 0–1 number invites "how did you compute that?"                                          | Every score carries its `Factor[]`; the UI renders the list verbatim; no AI in the scoring path                                     |
