@@ -1,8 +1,17 @@
+import { useState } from "react";
 import { Dashboard } from "./components/Dashboard";
-import { IndiaMap } from "./components/IndiaMap";
+import { IndiaMap, type StateFeature } from "./components/IndiaMap";
 import { Queue } from "./components/Queue";
 
 function App() {
+  const [selectedState, setSelectedState] = useState<StateFeature | null>(null);
+  const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
+
+  const handleSelectState = (state: StateFeature | null) => {
+    setSelectedState(state);
+    setSelectedDistrict(null);
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-canvas text-ink">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-hairline bg-canvas px-md">
@@ -23,9 +32,14 @@ function App() {
 
       <main className="flex-1 p-md lg:p-lg">
         <div className="grid min-h-[calc(100vh-3.5rem-2rem)] grid-cols-1 gap-md lg:grid-cols-[1fr_24rem] lg:gap-lg">
-          <IndiaMap />
+          <IndiaMap
+            selectedState={selectedState}
+            onSelectState={handleSelectState}
+            selectedDistrict={selectedDistrict}
+            onSelectDistrict={({ district }) => setSelectedDistrict(district)}
+          />
           <div className="flex flex-col gap-md lg:gap-lg">
-            <Dashboard />
+            <Dashboard selectedDistrict={selectedDistrict} />
             <Queue />
           </div>
         </div>

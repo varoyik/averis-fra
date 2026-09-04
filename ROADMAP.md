@@ -225,13 +225,13 @@ npx mapshaper Districts/Census_2011/2011_Dist.shp -filter-fields ST_CEN_CD,DT_CE
 
 **Why:** If the anomaly engine and the UI both read one committed JSON file with one agreed shape, they never disagree, and the demo works offline.
 
-- [ ] 🅰 Define the `Claim` TypeScript type (schema below) in `src/lib/types.ts` — the handoff contract
-- [ ] 🅱 Write `scripts/py/generate_data.py` — **Python is fine here**: this script never ships, its output does. Seed it (`random.Random(1337)`) so regeneration is identical
-- [ ] 🅱 Build realistic name pools (claimants, villages, gram panchayats, forest ranges) for the demo districts
-- [ ] 🅱 Generate ~300–800 claims across ~10 districts of one demo state, so charts look real but load instantly
-- [ ] 🅱 Embed the 5 scenarios: A (one district with slow DLC stage) · B (claims with area mismatch >30%) · C (duplicate pairs with slight spelling drift) · D (a tight geo-cluster in one tehsil) · E (**one hero claim carrying all signals**, in a designated hero district)
-- [ ] 🅱 Write `scripts/py/validate_data.py` — schema check, chronological stages, scenario A–E presence — and run it before committing
-- [ ] 🅱 Commit `data/generated/claims.json` — no runtime fetching, ever
+- [x] 🅰 Define the `Claim` TypeScript type (schema below) in `src/lib/types.ts` — the handoff contract
+- [x] 🅱 Write `scripts/py/generate_data.py` — **Python is fine here**: this script never ships, its output does. Seed it (`random.Random(1337)`) so regeneration is identical
+- [x] 🅱 Build realistic name pools (claimants, villages, gram panchayats, forest ranges) for the demo districts
+- [x] 🅱 Generate ~300–800 claims across ~10 districts of one demo state, so charts look real but load instantly
+- [x] 🅱 Embed the 5 scenarios: A (one district with slow DLC stage) · B (claims with area mismatch >30%) · C (duplicate pairs with slight spelling drift) · D (a tight geo-cluster in one tehsil) · E (**one hero claim carrying all signals**, in a designated hero district)
+- [x] 🅱 Write `scripts/py/validate_data.py` — schema check, chronological stages, scenario A–E presence — and run it before committing
+- [x] 🅱 Commit `data/generated/claims.json` — no runtime fetching, ever
 
 ```ts
 // src/lib/types.ts — the claim shape (mirrors real FRA Form A fields)
@@ -295,13 +295,13 @@ export function mulberry32(seed: number) {
 
 **Why:** "Analytical truth outside the LLM" is the core architecture decision. The AI only _explains_ what this module already proved.
 
-- [ ] 🅰 Stub the contract in `src/lib/types.ts` + `src/analytics/*.ts`: exact function signatures, input/output types, empty bodies — teammate fills the logic against it
-- [ ] 🅱 `processing.ts` — per-stage durations vs district baseline (IQR), per district. Flags "statistically unusual processing time", never "overdue"
-- [ ] 🅱 `consistency.ts` — land mismatch: `|areaClaimedHa − areaInRecordHa| / areaInRecordHa > 0.3` → flag with both values
-- [ ] 🅱 `duplicates.ts` — block on `village + khasraNo`, then Jaccard ≥ 0.85 on token union of name fields; also flag the trivial case: same khasra claimed by >1 claimant
-- [ ] 🅱 `spatial.ts` — count claims per 0.25°×0.25° grid cell; flag cells in the top decile; also rank districts by anomaly-claim density
-- [ ] 🅱 `score.ts` — weighted combine into `0..1` risk score, keeping a **per-signal factor list** (the UI renders this list as the "why flagged?" panel — no recompute, no AI)
-- [ ] 🅱 `scripts/smoke-engine.ts` (run with `npx tsx` — add `tsx` as a dev dependency) — asserts each scenario A–E produces its expected flag; his machine-checkable "done"
+- [x] 🅰 Stub the contract in `src/lib/types.ts` + `src/analytics/*.ts`: exact function signatures, input/output types, empty bodies — teammate fills the logic against it
+- [x] 🅱 `processing.ts` — per-stage durations vs district baseline (IQR), per district. Flags "statistically unusual processing time", never "overdue"
+- [x] 🅱 `consistency.ts` — land mismatch: `|areaClaimedHa − areaInRecordHa| / areaInRecordHa > 0.3` → flag with both values
+- [x] 🅱 `duplicates.ts` — block on `village + khasraNo`, then Jaccard ≥ 0.85 on token union of name fields; also flag the trivial case: same khasra claimed by >1 claimant
+- [x] 🅱 `spatial.ts` — count claims per 0.25°×0.25° grid cell; flag cells in the top decile; also rank districts by anomaly-claim density
+- [x] 🅱 `score.ts` — weighted combine into `0..1` risk score, keeping a **per-signal factor list** (the UI renders this list as the "why flagged?" panel — no recompute, no AI)
+- [x] 🅱 `scripts/smoke-engine.ts` (run with `npx tsx` — add `tsx` as a dev dependency) — asserts each scenario A–E produces its expected flag; his machine-checkable "done"
 
 ```ts
 // processing.ts — IQR outlier threshold (robust to the heavy tail of delays)
@@ -341,13 +341,13 @@ export const riskScore = (factors: Factor[]) =>
 
 **What:** The front door. National choropleth → click a state → zoom to its districts → click a district → select it and open the dashboard panel. Colors come from the same shared scale as the legend and dashboard.
 
-- [ ] Render India states from `data/states.geojson` with a choropleth `style` function
-- [ ] Shared color function: `riskColor(score)` → green/amber/red, used by map, legend, and dashboard (one source of truth)
-- [ ] Hover tooltip: state name + one KPI + risk status
-- [ ] Click state → `fitBounds` to that state's bounds, swap in the district layer
-- [ ] Click district → select (highlight) + trigger the dashboard panel for that district
-- [ ] Legend + a visible **"Demo data — synthetic records"** label (guardrail)
-- [ ] Offline-safe: if map tiles fail to load, keep a plain light background — choropleth still works without the tile server
+- [x] Render India states from `data/states.geojson` with a choropleth `style` function
+- [x] Shared color function: `riskColor(score)` → green/amber/red, used by map, legend, and dashboard (one source of truth)
+- [x] Hover tooltip: state name + one KPI + risk status
+- [x] Click state → `fitBounds` to that state's bounds, swap in the district layer
+- [x] Click district → select (highlight) + trigger the dashboard panel for that district
+- [x] Legend + a visible **"Demo data — synthetic records"** label (guardrail)
+- [x] Offline-safe: if map tiles fail to load, keep a plain light background — choropleth still works without the tile server
 
 ```tsx
 // src/components/IndiaMap.tsx — the whole choropleth pattern

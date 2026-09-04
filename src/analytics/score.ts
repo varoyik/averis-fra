@@ -17,17 +17,17 @@ import type {
 } from "../lib/types";
 import { detectProcessingAnomalies } from "./processing";
 import { detectConsistencyAnomalies } from "./consistency";
-import { detectDuplicateAnomalies }   from "./duplicates";
+import { detectDuplicateAnomalies } from "./duplicates";
 import { detectSpatialAnomalies, rankDistrictsByDensity } from "./spatial";
 
 // ── Weights (must sum to 1.0) ─────────────────────────────────
 // These match the weight fields in each detector's Factor output.
 // Changing here alone won't fix things — also update detector files.
 const WEIGHTS = {
-  processing:  0.30,
+  processing: 0.3,
   consistency: 0.25,
-  duplicate:   0.25,
-  spatial:     0.20,
+  duplicate: 0.25,
+  spatial: 0.2,
 } as const;
 
 // ── Weighted risk score (0..1) ────────────────────────────────
@@ -44,20 +44,23 @@ export function riskBand(score: number): "normal" | "watch" | "high" {
 }
 
 // ── Colour for the choropleth map ────────────────────────────
+// Theme-aligned hexes shared by the map, legend, and dashboard.
+export const noDataColor = "#62666d";
+
 export function riskColor(score: number): string {
   const band = riskBand(score);
-  if (band === "high")   return "#dc2626"; // red-600
-  if (band === "watch")  return "#d97706"; // amber-600
-  return "#16a34a";                         // green-600
+  if (band === "high") return "#ef4444"; // risk-high
+  if (band === "watch") return "#f5a623"; // risk-watch
+  return "#27a644"; // risk-low
 }
 
 // ── Main engine: run all detectors + combine ──────────────────
 export function runEngine(claims: Claim[]): EngineOutput {
   // Run all 4 detectors
-  const processingFlags  = detectProcessingAnomalies(claims);
+  const processingFlags = detectProcessingAnomalies(claims);
   const consistencyFlags = detectConsistencyAnomalies(claims);
-  const duplicateFlags   = detectDuplicateAnomalies(claims);
-  const spatialFlags     = detectSpatialAnomalies(claims);
+  const duplicateFlags = detectDuplicateAnomalies(claims);
+  const spatialFlags = detectSpatialAnomalies(claims);
 
   // Per-claim: combine non-null factors into one ClaimResult
   const allClaimResults: ClaimResult[] = claims.map((claim) => {
@@ -76,9 +79,7 @@ export function runEngine(claims: Claim[]): EngineOutput {
   });
 
   // Index for quick lookup
-  const claimResultByid = new Map(
-    allClaimResults.map((r) => [r.claimId, r])
-  );
+  const claimResultByid = new Map(allClaimResults.map((r) => [r.claimId, r]));
 
   // Per-district: aggregate
   const byDistrict = new Map<string, { claims: Claim[]; state: string }>();
@@ -104,7 +105,7 @@ export function runEngine(claims: Claim[]): EngineOutput {
     const districtScore =
       top10.length > 0
         ? Math.round(
-            (top10.reduce((s, r) => s + r.riskScore, 0) / top10.length) * 1000
+            (top10.reduce((s, r) => s + r.riskScore, 0) / top10.length) * 1000,
           ) / 1000
         : 0;
 
@@ -151,7 +152,7 @@ export function runEngine(claims: Claim[]): EngineOutput {
 // ── Convenience: look up one district's result ────────────────
 export function districtRisk(
   districtName: string,
-  output: EngineOutput
+  output: EngineOutput,
 ): number {
   return (
     output.districts.find((d) => d.district === districtName)?.riskScore ?? 0
@@ -161,10 +162,14 @@ export function districtRisk(
 // ── Factor key → human label ──────────────────────────────────
 function factorKeyLabel(key: Factor["key"]): string {
   switch (key) {
-    case "processing":  return "Workflow bottleneck";
-    case "consistency": return "Land record mismatch";
-    case "duplicate":   return "Near-duplicate claims";
-    case "spatial":     return "Geographic concentration";
+    case "processing":
+      return "Workflow bottleneck";
+    case "consistency":
+      return "Land record mismatch";
+    case "duplicate":
+      return "Near-duplicate claims";
+    case "spatial":
+      return "Geographic concentration";
   }
 }
 
