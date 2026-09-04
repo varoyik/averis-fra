@@ -69,7 +69,9 @@ export function runEngine(claims: Claim[]): EngineOutput {
       consistencyFlags.get(claim.claimId),
       duplicateFlags.get(claim.claimId),
       spatialFlags.get(claim.claimId),
-    ].filter((f): f is Factor => f !== null && f !== undefined);
+    ]
+      .filter((f): f is Factor => f !== null && f !== undefined)
+      .sort((a, b) => b.weight * b.score - a.weight * a.score);
 
     return {
       claimId: claim.claimId,

@@ -498,24 +498,52 @@ function Spinner({ className }: { className?: string }) {
   );
 }
 
-function AiInvestigation({ factors }: { factors: Factor[] }) {
+// Response shape of POST /api/investigate (see api/types.ts).
+interface AiNarrative {
+  findings: string[];
+  reasoning: string;
+  confidence: "high" | "medium" | "low";
+  limitations: string[];
+  openQuestions: string[];
+  isFallback: boolean;
+}
+
+function confidenceLabel(c: AiNarrative["confidence"]): string {
+  if (c === "high") return "High confidence";
+  if (c === "medium") return "Medium confidence";
+  return "Low confidence";
+}
+
+function AiInvestigation({
+  claim,
+  factors,
+}: {
+  claim: Claim;
+  factors: Factor[];
+}) {
   const [loading, setLoading] = useState(false);
-  const [narrative, setNarrative] = useState<string | null>(null);
+  const [narrative, setNarrative] = useState<AiNarrative | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const runInvestigation = async () => {
     setLoading(true);
     setNarrative(null);
+    setError(null);
 
-    // Fake async delay to simulate an AI call while the real endpoint is being
-    // built in phase 1.6.
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-
-    // TODO 1.6: replace stub with fetch('/api/investigate', ...)
-    const fallback = factors
-      .map((f) => `${f.label}: ${f.detail}.`)
-      .join("\n\n");
-    setNarrative(fallback);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/investigate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ evidence: { claim, factors } }),
+      });
+      if (!res.ok) throw new Error(`Server responded with ${res.status}`);
+      setNarrative((await res.json()) as AiNarrative);
+    } catch (err) {
+      // Plain `vite dev` has no /api route — keep the evidence readable instead of dying.
+      setError(err instanceof Error ? err.message : "Request failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -538,17 +566,94 @@ function AiInvestigation({ factors }: { factors: Factor[] }) {
         </button>
       </div>
 
-      {narrative && (
+      {error && (
         <div className="mt-sm rounded-md border border-hairline bg-surface-2 p-sm">
           <div className="mb-2 text-xs uppercase tracking-wider text-ink-tertiary">
-            Template fallback narrative
+            AI service unreachable — evidence preview
           </div>
-          <div className="space-y-2">
-            {narrative.split("\n\n").map((sentence, i) => (
-              <p key={i} className="text-sm text-ink-muted">
-                {sentence}
-              </p>
+          <p className="text-xs text-ink-muted">
+            {error}. The full narrative works on the Vercel deploy. Here is the
+            engine evidence for this claim:
+          </p>
+          <ul className="mt-2 space-y-1">
+            {factors.map((f, i) => (
+              <li key={i} className="text-sm text-ink-muted">
+                {f.label}: {f.detail}.
+              </li>
             ))}
+          </ul>
+        </div>
+      )}
+
+      {narrative && (
+        <div className="mt-sm space-y-3">
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-xs px-xs py-px text-xs font-medium ${
+                narrative.isFallback
+                  ? "bg-risk-watch/15 text-risk-watch"
+                  : "bg-risk-low/15 text-risk-low"
+              }`}
+            >
+              {narrative.isFallback ? "Template fallback" : "AI narrative"}
+            </span>
+            <span className="text-xs text-ink-subtle">
+              {confidenceLabel(narrative.confidence)}
+            </span>
+          </div>
+
+          <div className="rounded-md border border-hairline bg-surface-2 p-sm">
+            <div className="mb-2 text-xs uppercase tracking-wider text-ink-tertiary">
+              Findings
+            </div>
+            <ul className="list-inside list-disc space-y-1">
+              {narrative.findings.map((f, i) => (
+                <li key={i} className="text-sm text-ink-muted">
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="rounded-md border border-hairline bg-surface-2 p-sm">
+            <div className="mb-2 text-xs uppercase tracking-wider text-ink-tertiary">
+              Reasoning
+            </div>
+            <p className="text-sm text-ink-muted">{narrative.reasoning}</p>
+          </div>
+
+          <div className="rounded-md border border-hairline bg-surface-2 p-sm">
+            <div className="mb-2 text-xs uppercase tracking-wider text-ink-tertiary">
+              Limitations
+            </div>
+            {narrative.limitations.length > 0 ? (
+              <ul className="list-inside list-disc space-y-1">
+                {narrative.limitations.map((l, i) => (
+                  <li key={i} className="text-sm text-ink-muted">
+                    {l}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-ink-muted">None noted.</p>
+            )}
+          </div>
+
+          <div className="rounded-md border border-hairline bg-surface-2 p-sm">
+            <div className="mb-2 text-xs uppercase tracking-wider text-ink-tertiary">
+              For a human investigator
+            </div>
+            {narrative.openQuestions.length > 0 ? (
+              <ul className="list-inside list-disc space-y-1">
+                {narrative.openQuestions.map((q, i) => (
+                  <li key={i} className="text-sm text-ink-muted">
+                    {q}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-ink-muted">None.</p>
+            )}
           </div>
         </div>
       )}
@@ -599,7 +704,7 @@ export function Investigation({ claim, result, onBack }: InvestigationProps) {
         <WhyFlaggedPanel result={result} />
       </div>
 
-      <AiInvestigation factors={result.factors} />
+      <AiInvestigation claim={claim} factors={result.factors} />
     </div>
   );
 }

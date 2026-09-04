@@ -414,10 +414,10 @@ import { riskColor, districtRisk } from "../analytics/score";
 
 **What:** One Vercel serverless function that receives the claim's structured evidence JSON and returns a structured narrative (findings, reasoning, confidence, limitations, open questions). Gemini free tier.
 
-- [ ] `api/investigate.ts` — reads `GEMINI_API_KEY` from env, calls Gemini with JSON schema output, never exposes the key
-- [ ] Prompt contract (below) baked into the function — the guardrails live in the prompt
-- [ ] Validate the AI's JSON with zod; on failure → deterministic **template fallback** (renders the same `Factor[]` as plain sentences) so the demo can never die on the AI
-- [ ] `vercel.json` with SPA rewrites + the function route (below)
+- [x] `api/investigate.ts` — reads `GEMINI_API_KEY` from env, calls Gemini with JSON schema output, never exposes the key
+- [x] Prompt contract (below) baked into the function — the guardrails live in the prompt
+- [x] Validate the AI's JSON with zod; on failure → deterministic **template fallback** (renders the same `Factor[]` as plain sentences) so the demo can never die on the AI
+- [x] `vercel.json` with SPA rewrites + the function route (below)
 - [ ] Deploy + test from the live URL once
 
 ```ts
@@ -470,9 +470,9 @@ export default async function handler(req: Request) {
 
 **What:** The landing "so what" — a ranked list that closes the demo.
 
-- [ ] Rank districts by risk score; within the hero district, rank claims
-- [ ] Each row: rank, name, score, **dominant reason(s)** (top `Factor` labels), and a "Investigate →" action that deep-links to 1.5
-- [ ] Recommendation copy: "Investigate first — <dominant reason>" — a _recommendation to investigate_, never a decision on the claim
+- [x] Rank districts by risk score; within the hero district, rank claims
+- [x] Each row: rank, name, score, **dominant reason(s)** (top `Factor` labels), and a "Investigate →" action that deep-links to 1.5
+- [x] Recommendation copy: "Investigate first — <dominant reason>" — a _recommendation to investigate_, never a decision on the claim
 - [ ] One-click from queue → claim workspace → AI narrative (the demo's final path)
 
 ---

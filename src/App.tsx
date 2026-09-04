@@ -94,7 +94,7 @@ function App() {
                 selectedDistrictState={selectedDistrictState}
                 onSelectClaim={handleSelectClaim}
               />
-              <Queue />
+              <Queue onSelectClaim={handleSelectClaim} />
             </div>
           </div>
         )}
