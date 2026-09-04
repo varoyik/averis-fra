@@ -6,10 +6,22 @@ import { Queue } from "./components/Queue";
 function App() {
   const [selectedState, setSelectedState] = useState<StateFeature | null>(null);
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
+  const [selectedDistrictState, setSelectedDistrictState] = useState<
+    string | null
+  >(null);
 
   const handleSelectState = (state: StateFeature | null) => {
     setSelectedState(state);
     setSelectedDistrict(null);
+    setSelectedDistrictState(null);
+  };
+
+  const handleSelectDistrict = (payload: {
+    district: string;
+    state: string;
+  }) => {
+    setSelectedDistrict(payload.district);
+    setSelectedDistrictState(payload.state);
   };
 
   return (
@@ -36,10 +48,14 @@ function App() {
             selectedState={selectedState}
             onSelectState={handleSelectState}
             selectedDistrict={selectedDistrict}
-            onSelectDistrict={({ district }) => setSelectedDistrict(district)}
+            onSelectDistrict={handleSelectDistrict}
           />
           <div className="flex flex-col gap-md lg:gap-lg">
-            <Dashboard selectedDistrict={selectedDistrict} />
+            <Dashboard
+              selectedState={selectedState}
+              selectedDistrict={selectedDistrict}
+              selectedDistrictState={selectedDistrictState}
+            />
             <Queue />
           </div>
         </div>

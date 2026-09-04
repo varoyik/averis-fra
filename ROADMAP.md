@@ -389,11 +389,11 @@ import { riskColor, districtRisk } from "../analytics/score";
 
 **What:** The side panel next to the map, for the selected state/district. It reports KPIs _and_ calls out what's abnormal.
 
-- [ ] KPI row: claims received · settled · pending · approval rate · median processing time · high-risk count
-- [ ] Status distribution (received vs titles vs rejected vs pending) as one small chart (recharts)
-- [ ] "What's unusual here" block: top anomalies in this unit (from the engine output) — this is the part that differentiates us from a generic dashboard
-- [ ] Trend/summary line for processing time over recent months (synthetic)
-- [ ] Everything reads from the same committed JSON + engine output — no hardcoded conclusions
+- [x] KPI row: claims received · settled · pending · approval rate · median processing time · high-risk count
+- [x] Status distribution (received vs titles vs rejected vs pending) as one small chart (recharts)
+- [x] "What's unusual here" block: top anomalies in this unit (from the engine output) — this is the part that differentiates us from a generic dashboard
+- [x] Trend/summary line for processing time over recent months (synthetic)
+- [x] Everything reads from the same committed JSON + engine output — no hardcoded conclusions
 
 ---
 
