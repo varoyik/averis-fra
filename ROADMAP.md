@@ -401,12 +401,12 @@ import { riskColor, districtRisk } from "../analytics/score";
 
 **What:** The deepest screen — opened by clicking any flagged claim. This is the screen the judges will stare at, so it must be clean and complete.
 
-- [ ] Claim identity card: name, category, village, tehsil, district, right type, status
-- [ ] **Process timeline**: Gram Sabha → SDLC → DLC → Title, with real dates and per-stage durations; highlight any stage the engine flagged
-- [ ] **Record comparison**: side-by-side `areaClaimedHa` vs `areaInRecordHa` with the difference called out visually
-- [ ] **Claim location on the map**: small map inset with the claim + its grid cell / cluster context
-- [ ] **"Why was this flagged?" panel**: renders the claim's `Factor[]` list verbatim — evidence first, AI later
-- [ ] "Run AI investigation" button → calls the function from 1.6, shows a loading state
+- [x] Claim identity card: name, category, village, tehsil, district, right type, status
+- [x] **Process timeline**: Gram Sabha → SDLC → DLC → Title, with real dates and per-stage durations; highlight any stage the engine flagged
+- [x] **Record comparison**: side-by-side `areaClaimedHa` vs `areaInRecordHa` with the difference called out visually
+- [x] **Claim location on the map**: small map inset with the claim + its grid cell / cluster context
+- [x] **"Why was this flagged?" panel**: renders the claim's `Factor[]` list verbatim — evidence first, AI later
+- [x] "Run AI investigation" button → calls the function from 1.6, shows a loading state
 
 ---
 

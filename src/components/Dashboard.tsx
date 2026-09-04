@@ -21,6 +21,7 @@ interface DashboardProps {
   selectedState: StateFeature | null;
   selectedDistrict: string | null;
   selectedDistrictState: string | null;
+  onSelectClaim: (claimId: string) => void;
 }
 
 const BRAND = "#5e6ad2";
@@ -259,6 +260,7 @@ export function Dashboard({
   selectedState,
   selectedDistrict,
   selectedDistrictState,
+  onSelectClaim,
 }: DashboardProps) {
   const engineOutput = useMemo(() => runEngine(claims as Claim[]), []);
 
@@ -376,29 +378,32 @@ export function Dashboard({
                   </div>
                   <ul className="space-y-sm">
                     {topClaims.map((r) => (
-                      <li
-                        key={r.claimId}
-                        className="flex items-start justify-between gap-2 rounded-md border border-hairline bg-surface-2 p-sm"
-                      >
-                        <div>
-                          <div className="font-mono text-xs text-ink">
-                            {r.claimId}
-                          </div>
-                          <div className="mt-0.5 text-xs text-ink-subtle">
-                            {r.factors[0]?.label ?? "Multiple signals"}
-                          </div>
-                        </div>
-                        <span
-                          className={`shrink-0 rounded-xs px-xs py-px text-xs font-medium ${badgeClasses(
-                            r.riskScore >= 0.55
-                              ? "high"
-                              : r.riskScore >= 0.25
-                                ? "watch"
-                                : "normal",
-                          )}`}
+                      <li key={r.claimId}>
+                        <button
+                          type="button"
+                          onClick={() => onSelectClaim(r.claimId)}
+                          className="flex w-full items-start justify-between gap-2 rounded-md border border-hairline bg-surface-2 p-sm text-left transition-colors hover:bg-surface-3 focus:outline-none focus:ring-2 focus:ring-brand-focus"
                         >
-                          {(r.riskScore * 100).toFixed(0)}%
-                        </span>
+                          <div>
+                            <div className="font-mono text-xs text-ink">
+                              {r.claimId}
+                            </div>
+                            <div className="mt-0.5 text-xs text-ink-subtle">
+                              {r.factors[0]?.label ?? "Multiple signals"}
+                            </div>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-xs px-xs py-px text-xs font-medium ${badgeClasses(
+                              r.riskScore >= 0.55
+                                ? "high"
+                                : r.riskScore >= 0.25
+                                  ? "watch"
+                                  : "normal",
+                            )}`}
+                          >
+                            {(r.riskScore * 100).toFixed(0)}%
+                          </span>
+                        </button>
                       </li>
                     ))}
                   </ul>
