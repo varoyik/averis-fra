@@ -19,4 +19,14 @@ export default defineConfig({
       },
     },
   ],
+  server: {
+    // `vite dev` has no /api route — proxy to the live Vercel
+    // function so local development gets real AI narratives.
+    proxy: {
+      "/api": {
+        target: "https://averis-fra.vercel.app",
+        changeOrigin: true,
+      },
+    },
+  },
 });

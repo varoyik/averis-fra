@@ -16,7 +16,6 @@
 //     openQuestions, isFallback }
 // ─────────────────────────────────────────────────────────────
 
-import { z } from "zod";
 import type { EvidencePayload, InvestigationResult } from "./types";
 import type { Factor } from "../src/lib/types";
 
@@ -70,17 +69,53 @@ const NARRATIVE_SCHEMA = {
       description: "Questions a human investigator should verify next.",
     },
   },
-  required: ["findings", "reasoning", "confidence", "limitations", "openQuestions"],
+  required: [
+    "findings",
+    "reasoning",
+    "confidence",
+    "limitations",
+    "openQuestions",
+  ],
 };
 
-// ── Zod schema — validates Gemini's JSON output ───────────────
-const ResultSchema = z.object({
-  findings: z.array(z.string()).min(1),
-  reasoning: z.string().min(1),
-  confidence: z.enum(["high", "medium", "low"]),
-  limitations: z.array(z.string()),
-  openQuestions: z.array(z.string()),
-});
+// ── Result validator (hand-rolled — no dependencies) ─────────
+// Gemini's JSON output is validated here. Keeping the function
+// dependency-free removes any bundler/runtime failure surface on
+// Vercel; a bad shape throws and lands in the template fallback.
+function validateResult(raw: unknown): InvestigationResult {
+  if (typeof raw !== "object" || raw === null) {
+    throw new Error("Result is not an object");
+  }
+  const r = raw as Record<string, unknown>;
+
+  const isStringArray = (v: unknown): v is string[] =>
+    Array.isArray(v) && v.every((item) => typeof item === "string");
+
+  if (!isStringArray(r.findings) || r.findings.length === 0) {
+    throw new Error("findings must be a non-empty string array");
+  }
+  if (typeof r.reasoning !== "string" || r.reasoning.length === 0) {
+    throw new Error("reasoning must be a non-empty string");
+  }
+  if (!["high", "medium", "low"].includes(r.confidence as string)) {
+    throw new Error("confidence must be one of: high, medium, low");
+  }
+  if (!isStringArray(r.limitations)) {
+    throw new Error("limitations must be a string array");
+  }
+  if (!isStringArray(r.openQuestions)) {
+    throw new Error("openQuestions must be a string array");
+  }
+
+  return {
+    findings: r.findings,
+    reasoning: r.reasoning,
+    confidence: r.confidence as InvestigationResult["confidence"],
+    limitations: r.limitations,
+    openQuestions: r.openQuestions,
+    isFallback: false,
+  };
+}
 
 // ── Deterministic template fallback ──────────────────────────
 // If Gemini is unavailable / rate-limited / returns bad JSON,
@@ -104,7 +139,9 @@ function templateFallback(evidence: EvidencePayload): InvestigationResult {
     }
   });
 
-  const dominantFactor = [...factors].sort((a, b) => b.weight * b.score - a.weight * a.score)[0];
+  const dominantFactor = [...factors].sort(
+    (a, b) => b.weight * b.score - a.weight * a.score,
+  )[0];
 
   const reasoning =
     `This ${claim.rightType} claim by ${claim.claimant.name} ` +
@@ -116,9 +153,18 @@ function templateFallback(evidence: EvidencePayload): InvestigationResult {
     `A human investigator should review the original claim documentation before any decision.`;
 
   const limitations: string[] = [];
-  if (!claim.geo) limitations.push("No geospatial coordinates available for spatial verification.");
-  if (!claim.stages.dlcDecision) limitations.push("DLC stage has not been reached; processing timeline is incomplete.");
-  if (claim.evidenceCount < 3) limitations.push(`Only ${claim.evidenceCount} supporting document(s) on record — below recommended minimum.`);
+  if (!claim.geo)
+    limitations.push(
+      "No geospatial coordinates available for spatial verification.",
+    );
+  if (!claim.stages.dlcDecision)
+    limitations.push(
+      "DLC stage has not been reached; processing timeline is incomplete.",
+    );
+  if (claim.evidenceCount < 3)
+    limitations.push(
+      `Only ${claim.evidenceCount} supporting document(s) on record — below recommended minimum.`,
+    );
 
   const openQuestions: string[] = [
     `Was the ${dominantFactor?.label ?? "reported anomaly"} raised during a previous review?`,
@@ -127,7 +173,10 @@ function templateFallback(evidence: EvidencePayload): InvestigationResult {
   ];
 
   return {
-    findings: findings.length > 0 ? findings : ["No specific anomaly details available."],
+    findings:
+      findings.length > 0
+        ? findings
+        : ["No specific anomaly details available."],
     reasoning,
     confidence: "medium",
     limitations,
@@ -160,16 +209,25 @@ export default async function handler(req: Request): Promise<Response> {
   // ── Parse the request body ──────────────────────────────────
   let evidence: EvidencePayload;
   try {
-    const body = await req.json() as { evidence?: EvidencePayload };
-    if (!body.evidence || !body.evidence.claim || !Array.isArray(body.evidence.factors)) {
-      throw new Error("Missing required field: evidence.claim or evidence.factors");
+    const body = (await req.json()) as { evidence?: EvidencePayload };
+    if (
+      !body.evidence ||
+      !body.evidence.claim ||
+      !Array.isArray(body.evidence.factors)
+    ) {
+      throw new Error(
+        "Missing required field: evidence.claim or evidence.factors",
+      );
     }
     evidence = body.evidence;
   } catch (parseErr) {
     console.error("[investigate] Bad request body:", parseErr);
     return new Response(
       JSON.stringify({ error: "Bad request: " + String(parseErr) }),
-      { status: 400, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
+      {
+        status: 400,
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -177,7 +235,9 @@ export default async function handler(req: Request): Promise<Response> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     // No key → return fallback immediately (no error to the client)
-    console.warn("[investigate] GEMINI_API_KEY not set — using template fallback");
+    console.warn(
+      "[investigate] GEMINI_API_KEY not set — using template fallback",
+    );
     const fallback = templateFallback(evidence);
     return new Response(JSON.stringify(fallback), {
       status: 200,
@@ -189,10 +249,19 @@ export default async function handler(req: Request): Promise<Response> {
   const model = "gemini-2.5-flash";
   const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
+  // Hard cap on the Gemini round-trip: if the API hangs (or is
+  // throttled), we answer with the template fallback instead of
+  // letting the whole function burn its maxDuration and 504.
+  const timeoutSignal =
+    typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+      ? AbortSignal.timeout(45_000)
+      : undefined;
+
   try {
     const geminiRes = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: timeoutSignal,
       body: JSON.stringify({
         systemInstruction: {
           parts: [{ text: SYSTEM_PROMPT }],
@@ -211,7 +280,7 @@ export default async function handler(req: Request): Promise<Response> {
         generationConfig: {
           responseMimeType: "application/json",
           responseSchema: NARRATIVE_SCHEMA,
-          temperature: 0.2,        // low temperature = consistent, evidence-bound output
+          temperature: 0.2, // low temperature = consistent, evidence-bound output
           maxOutputTokens: 1024,
         },
       }),
@@ -223,7 +292,7 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     // ── Parse Gemini's response ───────────────────────────────
-    const geminiData = await geminiRes.json() as {
+    const geminiData = (await geminiRes.json()) as {
       candidates?: Array<{
         content?: { parts?: Array<{ text?: string }> };
       }>;
@@ -234,22 +303,19 @@ export default async function handler(req: Request): Promise<Response> {
 
     const parsed: unknown = JSON.parse(rawText);
 
-    // ── Validate with zod ─────────────────────────────────────
-    const validated = ResultSchema.parse(parsed);
-
-    const result: InvestigationResult = {
-      ...validated,
-      isFallback: false,
-    };
+    // ── Validate the shape (throws → template fallback) ──────
+    const result = validateResult(parsed);
 
     return new Response(JSON.stringify(result), {
       status: 200,
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });
-
   } catch (err) {
     // Any failure (network, parse, zod) → deterministic fallback
-    console.error("[investigate] Gemini failed — using template fallback:", err);
+    console.error(
+      "[investigate] Gemini failed — using template fallback:",
+      err,
+    );
     const fallback = templateFallback(evidence);
     return new Response(JSON.stringify(fallback), {
       status: 200,
