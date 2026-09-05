@@ -13,6 +13,7 @@ import claims from "../../data/generated/claims.json";
 import districtsGeojson from "../../data/districts.geojson";
 import stateStats from "../../data/state-stats.json";
 import statesGeojson from "../../data/states.geojson";
+import { isCensusStateOf } from "../lib/geo";
 import type { Claim } from "../lib/types";
 
 export type StateFeature = GeoJSONTypes.Feature<
@@ -90,8 +91,10 @@ function MapContent({
       const stateName = selectedState.properties.ST_NM;
       return {
         type: "FeatureCollection",
-        features: districtsCollection.features.filter(
-          (f) => f.properties.ST_NM === stateName,
+        features: districtsCollection.features.filter((f) =>
+          // districts.geojson uses Census-2011 state names, states.geojson
+          // uses post-2019 names — match via alias (Telangana, Delhi, ...)
+          isCensusStateOf(stateName, f.properties.ST_NM),
         ),
       };
     }, [selectedState]);
@@ -112,7 +115,7 @@ function MapContent({
     const feature = districtsCollection.features.find(
       (f) =>
         f.properties.DISTRICT === selectedDistrict &&
-        f.properties.ST_NM === selectedState.properties.ST_NM,
+        isCensusStateOf(selectedState.properties.ST_NM, f.properties.ST_NM),
     );
     if (feature) {
       const bounds = L.geoJSON(
@@ -128,9 +131,21 @@ function MapContent({
     if (!feature?.properties) return { ...BASE_STYLE, fillColor: noDataColor };
     const props = feature.properties as StateFeature["properties"];
     const stat = statsById.get(props.id);
-    if (!stat) return { ...BASE_STYLE, fillColor: noDataColor };
-    const score = stat.pending / stat.claimsReceived;
-    return { ...BASE_STYLE, fillColor: riskColor(score) };
+    if (stat) {
+      const score = stat.pending / stat.claimsReceived;
+      return { ...BASE_STYLE, fillColor: riskColor(score) };
+    }
+    // No official figures — colour from synthetic claims if any exist.
+    const stateClaims = (claims as Claim[]).filter((c) =>
+      isCensusStateOf(props.ST_NM, c.location.state),
+    );
+    if (stateClaims.length === 0)
+      return { ...BASE_STYLE, fillColor: noDataColor };
+    const pending = stateClaims.filter((c) => c.status === "pending").length;
+    return {
+      ...BASE_STYLE,
+      fillColor: riskColor(pending / stateClaims.length),
+    };
   };
 
   const districtStyle = (
@@ -139,7 +154,7 @@ function MapContent({
     if (!feature?.properties) return { ...BASE_STYLE, fillColor: noDataColor };
     const props = feature.properties as DistrictFeature["properties"];
     const result = engineOutput.districts.find(
-      (d) => d.district === props.DISTRICT,
+      (d) => d.district === props.DISTRICT && d.state === props.ST_NM,
     );
     if (!result) return { ...BASE_STYLE, fillColor: noDataColor };
     const isSelected = props.DISTRICT === selectedDistrict;
@@ -157,10 +172,22 @@ function MapContent({
   ) => {
     const props = feature.properties as StateFeature["properties"];
     const stat = statsById.get(props.id);
-    const score = stat ? stat.pending / stat.claimsReceived : 0;
-    const band = stat ? riskBand(score) : null;
-    const pct = stat ? `${(score * 100).toFixed(1)}%` : "—";
-    const pending = stat ? stat.pending.toLocaleString() : "—";
+    const stateClaims = (claims as Claim[]).filter((c) =>
+      isCensusStateOf(props.ST_NM, c.location.state),
+    );
+    const isSynthetic = !stat;
+    const hasData = Boolean(stat) || stateClaims.length > 0;
+    const pending = stat
+      ? stat.pending
+      : stateClaims.filter((c) => c.status === "pending").length;
+    const score = stat
+      ? stat.pending / stat.claimsReceived
+      : stateClaims.length > 0
+        ? pending / stateClaims.length
+        : 0;
+    const band = hasData ? riskBand(score) : null;
+    const pct = hasData ? `${(score * 100).toFixed(1)}%` : "—";
+    const pendingText = hasData ? pending.toLocaleString() : "—";
     const statusText =
       band === "high"
         ? "High"
@@ -175,7 +202,11 @@ function MapContent({
     const content = `
       <div class="font-sans leading-snug">
         <div class="font-medium text-ink">${props.ST_NM}</div>
-        <div class="text-ink-muted text-xs">Pending ${pending} · ${pct} backlog</div>
+        <div class="text-ink-muted text-xs">${
+          isSynthetic && hasData
+            ? `Synthetic · ${pct} backlog`
+            : `Pending ${pendingText} · ${pct} backlog`
+        }</div>
         <div class="mt-1 flex items-center gap-1 text-xs" style="color:${dotColor}">
           <span class="inline-block h-1.5 w-1.5 rounded-full" style="background:${dotColor}"></span>
           ${statusText}
@@ -207,7 +238,7 @@ function MapContent({
   ) => {
     const props = feature.properties as DistrictFeature["properties"];
     const result = engineOutput.districts.find(
-      (d) => d.district === props.DISTRICT,
+      (d) => d.district === props.DISTRICT && d.state === props.ST_NM,
     );
     const score = result ? result.riskScore : 0;
     const band = result ? riskBand(score) : null;

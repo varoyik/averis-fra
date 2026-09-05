@@ -28,7 +28,7 @@ function tokenSet(claim: Claim): Set<string> {
     raw
       .toLowerCase()
       .split(/\s+/)
-      .filter((t) => t.length > 1)  // drop single-letter noise
+      .filter((t) => t.length > 1), // drop single-letter noise
   );
 }
 
@@ -41,8 +41,10 @@ function jaccard(a: Set<string>, b: Set<string>): number {
 }
 
 // ── Blocking key ──────────────────────────────────────────────
+// State-qualified so identical (village, khasra) pairs in different
+// states never block together.
 function blockKey(claim: Claim): string {
-  return `${claim.location.village.toLowerCase().trim()}|${claim.land.khasraNo.trim()}`;
+  return `${claim.location.state}|${claim.location.village.toLowerCase().trim()}|${claim.land.khasraNo.trim()}`;
 }
 
 // ── Main export ───────────────────────────────────────────────
@@ -50,10 +52,10 @@ function blockKey(claim: Claim): string {
 // If a claim is part of a duplicate pair it gets a Factor with
 // the matched claimId in the detail.
 export function detectDuplicateAnomalies(
-  claims: Claim[]
+  claims: Claim[],
 ): Map<string, Factor | null> {
   const result = new Map<string, Factor | null>(
-    claims.map((c) => [c.claimId, null])
+    claims.map((c) => [c.claimId, null]),
   );
 
   // ── Pass 1: blocking ─────────────────────────────────────────
@@ -77,12 +79,14 @@ export function detectDuplicateAnomalies(
           const b = block[j];
 
           const sim = jaccard(tokenSet(a), tokenSet(b));
-          const isTrivial = a.land.khasraNo === b.land.khasraNo &&
-                            a.location.village.toLowerCase() === b.location.village.toLowerCase();
+          const isTrivial =
+            a.land.khasraNo === b.land.khasraNo &&
+            a.location.village.toLowerCase() ===
+              b.location.village.toLowerCase();
 
           if (sim >= JACCARD_THRESHOLD || isTrivial) {
             const score = Math.min(0.5 + sim * 0.5, 1.0); // 0.5 baseline for trivial
-            const pct   = Math.round(sim * 100);
+            const pct = Math.round(sim * 100);
 
             // Flag A pointing to B
             result.set(a.claimId, {

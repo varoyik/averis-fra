@@ -76,6 +76,35 @@
   body {
     @apply bg-canvas text-ink font-sans antialiased;
   }
+
+  /* Themed, very thin scrollbars for every scrollable area.
+     Reserved brand lavender is intentionally not used here. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #34343a transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: #34343a;
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: #8a8f98;
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 /* Leaflet dark map chrome */

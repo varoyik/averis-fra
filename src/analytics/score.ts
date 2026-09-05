@@ -19,6 +19,7 @@ import { detectProcessingAnomalies } from "./processing";
 import { detectConsistencyAnomalies } from "./consistency";
 import { detectDuplicateAnomalies } from "./duplicates";
 import { detectSpatialAnomalies, rankDistrictsByDensity } from "./spatial";
+import { districtKey } from "../lib/geo";
 
 // ── Weights (must sum to 1.0) ─────────────────────────────────
 // These match the weight fields in each detector's Factor output.
@@ -83,18 +84,27 @@ export function runEngine(claims: Claim[]): EngineOutput {
   // Index for quick lookup
   const claimResultByid = new Map(allClaimResults.map((r) => [r.claimId, r]));
 
-  // Per-district: aggregate
-  const byDistrict = new Map<string, { claims: Claim[]; state: string }>();
+  // Per-district: aggregate. Keyed by (state, district) so shared
+  // district names across states never merge baselines.
+  const byDistrict = new Map<
+    string,
+    { district: string; claims: Claim[]; state: string }
+  >();
   for (const c of claims) {
-    const d = c.location.district;
-    if (!byDistrict.has(d))
-      byDistrict.set(d, { claims: [], state: c.location.state });
-    byDistrict.get(d)!.claims.push(c);
+    const key = districtKey(c.location.state, c.location.district);
+    if (!byDistrict.has(key)) {
+      byDistrict.set(key, {
+        district: c.location.district,
+        claims: [],
+        state: c.location.state,
+      });
+    }
+    byDistrict.get(key)!.claims.push(c);
   }
 
   const districts: DistrictResult[] = [];
 
-  for (const [district, { claims: dClaims, state }] of byDistrict.entries()) {
+  for (const { district, claims: dClaims, state } of byDistrict.values()) {
     const claimResults = dClaims
       .map((c) => claimResultByid.get(c.claimId)!)
       .sort((a, b) => b.riskScore - a.riskScore);
@@ -152,12 +162,22 @@ export function runEngine(claims: Claim[]): EngineOutput {
 }
 
 // ── Convenience: look up one district's result ────────────────
+// Backwards-compatible: when `state` is omitted, falls back to a
+// name-only match (single-state datasets behave exactly as before).
 export function districtRisk(
   districtName: string,
   output: EngineOutput,
+  state?: string,
 ): number {
+  if (state === undefined) {
+    return (
+      output.districts.find((d) => d.district === districtName)?.riskScore ?? 0
+    );
+  }
   return (
-    output.districts.find((d) => d.district === districtName)?.riskScore ?? 0
+    output.districts.find(
+      (d) => d.district === districtName && d.state === state,
+    )?.riskScore ?? 0
   );
 }
 

@@ -38,19 +38,17 @@ function assert(label: string, pass: boolean, detail: string) {
 // Expected: ≥10 claims in Shahdol district with a "processing"
 // factor whose detail mentions "> district threshold"
 // ──────────────────────────────────────────────────────────────
-const shahdolResult = output.districts.find(
-  (d) => d.district === "Shahdol"
-);
+const shahdolResult = output.districts.find((d) => d.district === "Shahdol");
 const shahdolBottleneck = shahdolResult
   ? shahdolResult.claimResults.filter((r) =>
-      r.factors.some((f) => f.key === "processing")
+      r.factors.some((f) => f.key === "processing"),
     ).length
   : 0;
 
 assert(
   "A — Processing bottleneck in Shahdol (≥10 flagged)",
   shahdolBottleneck >= 10,
-  `Found: ${shahdolBottleneck} claims with processing factor in Shahdol`
+  `Found: ${shahdolBottleneck} claims with processing factor in Shahdol`,
 );
 
 // ──────────────────────────────────────────────────────────────
@@ -59,13 +57,13 @@ assert(
 // factor (>30% mismatch)
 // ──────────────────────────────────────────────────────────────
 const mismatchCount = output.topClaims.filter((r) =>
-  r.factors.some((f) => f.key === "consistency")
+  r.factors.some((f) => f.key === "consistency"),
 ).length;
 
 assert(
   "B — Area mismatch flagged (≥15 claims)",
   mismatchCount >= 15,
-  `Found: ${mismatchCount} claims with consistency factor`
+  `Found: ${mismatchCount} claims with consistency factor`,
 );
 
 // ──────────────────────────────────────────────────────────────
@@ -73,13 +71,13 @@ assert(
 // Expected: ≥10 claims with a "duplicate" factor
 // ──────────────────────────────────────────────────────────────
 const dupCount = output.topClaims.filter((r) =>
-  r.factors.some((f) => f.key === "duplicate")
+  r.factors.some((f) => f.key === "duplicate"),
 ).length;
 
 assert(
   "C — Duplicate pairs detected (≥10 claims flagged)",
   dupCount >= 10,
-  `Found: ${dupCount} claims with duplicate factor`
+  `Found: ${dupCount} claims with duplicate factor`,
 );
 
 // ──────────────────────────────────────────────────────────────
@@ -87,13 +85,13 @@ assert(
 // Expected: ≥8 claims with a "spatial" factor
 // ──────────────────────────────────────────────────────────────
 const spatialCount = output.topClaims.filter((r) =>
-  r.factors.some((f) => f.key === "spatial")
+  r.factors.some((f) => f.key === "spatial"),
 ).length;
 
 assert(
   "D — Spatial cluster detected (≥8 claims flagged)",
   spatialCount >= 8,
-  `Found: ${spatialCount} claims with spatial factor`
+  `Found: ${spatialCount} claims with spatial factor`,
 );
 
 // ──────────────────────────────────────────────────────────────
@@ -101,15 +99,16 @@ assert(
 // Expected: exists in output AND carries ALL 4 factor types
 // ──────────────────────────────────────────────────────────────
 const HERO_ID = "MP-DIN-HERO-001";
-const heroResult = output.topClaims.find((r) => r.claimId === HERO_ID)
-  ?? output.districts
-       .flatMap((d) => d.claimResults)
-       .find((r) => r.claimId === HERO_ID);
+const heroResult =
+  output.topClaims.find((r) => r.claimId === HERO_ID) ??
+  output.districts
+    .flatMap((d) => d.claimResults)
+    .find((r) => r.claimId === HERO_ID);
 
 assert(
   "E — Hero claim exists in engine output",
   heroResult !== undefined,
-  heroResult ? `riskScore=${heroResult.riskScore}` : "NOT FOUND"
+  heroResult ? `riskScore=${heroResult.riskScore}` : "NOT FOUND",
 );
 
 if (heroResult) {
@@ -123,13 +122,13 @@ if (heroResult) {
   assert(
     "E — Hero claim carries all 4 signal types",
     allFour,
-    `Factors present: [${[...heroKeys].join(", ")}]`
+    `Factors present: [${[...heroKeys].join(", ")}]`,
   );
 
   assert(
     "E — Hero risk score > 0.5",
     heroResult.riskScore > 0.5,
-    `riskScore=${heroResult.riskScore}`
+    `riskScore=${heroResult.riskScore}`,
   );
 }
 
@@ -137,15 +136,71 @@ if (heroResult) {
 assert(
   "Engine — districts output non-empty",
   output.districts.length >= 8,
-  `${output.districts.length} districts`
+  `${output.districts.length} districts`,
 );
 
 assert(
   "Engine — topClaims sorted desc by riskScore",
   output.topClaims.every(
-    (r, i) => i === 0 || r.riskScore <= output.topClaims[i - 1].riskScore
+    (r, i) => i === 0 || r.riskScore <= output.topClaims[i - 1].riskScore,
   ),
-  "order check"
+  "order check",
+);
+
+// ──────────────────────────────────────────────────────────────
+// All-states coverage — every Census-2011 state must have at
+// least one district result. Will FAIL on the MP-only dataset;
+// it only passes once the regenerated all-states claims.json
+// lands (produced by the data lane).
+// ──────────────────────────────────────────────────────────────
+const CENSUS_STATE_NAMES = [
+  "Andhra Pradesh",
+  "Arunanchal Pradesh",
+  "Assam",
+  "Bihar",
+  "Chandigarh",
+  "Chhattisgarh",
+  "Dadara & Nagar Havelli",
+  "Daman & Diu",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jammu & Kashmir",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Lakshadweep",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "NCT of Delhi",
+  "Odisha",
+  "Puducherry",
+  "Punjab",
+  "Rajasthan",
+  "Sikkim",
+  "Tamil Nadu",
+  "Tripura",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+  "Andaman & Nicobar Island",
+];
+
+const statesWithoutDistricts = CENSUS_STATE_NAMES.filter(
+  (name) => !output.districts.some((d) => d.state === name),
+);
+
+assert(
+  "Engine — all 35 census states have ≥1 district result",
+  statesWithoutDistricts.length === 0,
+  statesWithoutDistricts.length === 0
+    ? "all states covered"
+    : `Missing: ${statesWithoutDistricts.join(", ")}`,
 );
 
 // ── Print results ─────────────────────────────────────────────
@@ -153,9 +208,7 @@ const width = Math.max(...results.map((r) => r.label.length)) + 2;
 const sep = "-".repeat(width + 30);
 
 console.log("\n" + sep);
-console.log(
-  `${"Assertion".padEnd(width)}  ${"Result".padEnd(8)}  Detail`
-);
+console.log(`${"Assertion".padEnd(width)}  ${"Result".padEnd(8)}  Detail`);
 console.log(sep);
 
 for (const { label, pass, detail } of results) {

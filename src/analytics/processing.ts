@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { Claim, Factor } from "../lib/types";
+import { districtKey } from "../lib/geo";
 
 // ── Stage keys in canonical order ────────────────────────────
 const STAGE_PAIRS: Array<{
@@ -18,10 +19,14 @@ const STAGE_PAIRS: Array<{
   to: keyof Claim["stages"];
   label: string;
 }> = [
-  { from: "gsResolution",  to: "sdlcForward",  label: "Gram Sabha → SDLC forward" },
-  { from: "sdlcForward",   to: "sdlcDecision", label: "SDLC processing"            },
-  { from: "sdlcDecision",  to: "dlcDecision",  label: "DLC processing"             },
-  { from: "dlcDecision",   to: "titleIssued",  label: "DLC → Title issuance"       },
+  {
+    from: "gsResolution",
+    to: "sdlcForward",
+    label: "Gram Sabha → SDLC forward",
+  },
+  { from: "sdlcForward", to: "sdlcDecision", label: "SDLC processing" },
+  { from: "sdlcDecision", to: "dlcDecision", label: "DLC processing" },
+  { from: "dlcDecision", to: "titleIssued", label: "DLC → Title issuance" },
 ];
 
 // ── IQR-based outlier threshold ───────────────────────────────
@@ -39,7 +44,7 @@ function iqrThreshold(durations: number[]): number {
 // ── Days between two ISO date strings ────────────────────────
 function daysBetween(a: string, b: string): number {
   return Math.round(
-    (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000
+    (new Date(b).getTime() - new Date(a).getTime()) / 86_400_000,
   );
 }
 
@@ -51,7 +56,7 @@ function stageDurations(claim: Claim): Array<{
   const result: Array<{ label: string; days: number }> = [];
   for (const { from, to, label } of STAGE_PAIRS) {
     const start = claim.stages[from];
-    const end   = claim.stages[to];
+    const end = claim.stages[to];
     if (start && end) {
       result.push({ label, days: daysBetween(start, end) });
     }
@@ -63,14 +68,15 @@ function stageDurations(claim: Claim): Array<{
 // Analyses all claims, returns a map of claimId → Factor | null.
 // null means this claim has no processing anomaly.
 export function detectProcessingAnomalies(
-  claims: Claim[]
+  claims: Claim[],
 ): Map<string, Factor | null> {
-  // 1. Group claims by district
+  // 1. Group claims by (state, district) — district names alone collide
+  //    across states (e.g. Aurangabad in Maharashtra and Bihar)
   const byDistrict = new Map<string, Claim[]>();
   for (const c of claims) {
-    const d = c.location.district;
-    if (!byDistrict.has(d)) byDistrict.set(d, []);
-    byDistrict.get(d)!.push(c);
+    const key = districtKey(c.location.state, c.location.district);
+    if (!byDistrict.has(key)) byDistrict.set(key, []);
+    byDistrict.get(key)!.push(c);
   }
 
   const result = new Map<string, Factor | null>();
@@ -78,7 +84,7 @@ export function detectProcessingAnomalies(
   for (const [, districtClaims] of byDistrict) {
     // 2. Collect all stage durations for this district to build the baseline
     const allDurations = districtClaims.flatMap((c) =>
-      stageDurations(c).map((s) => s.days)
+      stageDurations(c).map((s) => s.days),
     );
     const threshold = iqrThreshold(allDurations);
 
@@ -92,17 +98,20 @@ export function detectProcessingAnomalies(
 
       const worst = durations.reduce(
         (max, d) => (d.days > max.days ? d : max),
-        durations[0]
+        durations[0],
       );
 
       if (worst.days > threshold && threshold !== Infinity) {
         // Normalise: 1.0 = 3× threshold, scale linearly
-        const rawScore = Math.min((worst.days - threshold) / (2 * threshold), 1);
+        const rawScore = Math.min(
+          (worst.days - threshold) / (2 * threshold),
+          1,
+        );
 
         result.set(claim.claimId, {
           key: "processing",
           label: `Statistically unusual ${worst.label} stage`,
-          weight: 0.30,
+          weight: 0.3,
           score: Math.round(rawScore * 100) / 100,
           detail: `${worst.days} days vs district threshold ${Math.round(threshold)} days`,
         });

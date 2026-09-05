@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import { runEngine } from "../analytics/score";
+import { censusStatesFor } from "../lib/geo";
 import claims from "../../data/generated/claims.json";
 import stateStats from "../../data/state-stats.json";
 import type { Claim } from "../lib/types";
@@ -276,19 +277,23 @@ export function Dashboard({
   }, [selectedState]);
 
   const districtResult = useMemo(() => {
-    if (!selectedDistrict) return null;
+    if (!selectedDistrict || !selectedDistrictState) return null;
     return (
-      engineOutput.districts.find((d) => d.district === selectedDistrict) ??
-      null
+      engineOutput.districts.find(
+        (d) =>
+          d.district === selectedDistrict && d.state === selectedDistrictState,
+      ) ?? null
     );
-  }, [engineOutput, selectedDistrict]);
+  }, [engineOutput, selectedDistrict, selectedDistrictState]);
 
   const districtClaims = useMemo(() => {
-    if (!selectedDistrict) return [];
+    if (!selectedDistrict || !selectedDistrictState) return [];
     return (claims as Claim[]).filter(
-      (c) => c.location.district === selectedDistrict,
+      (c) =>
+        c.location.district === selectedDistrict &&
+        c.location.state === selectedDistrictState,
     );
-  }, [selectedDistrict]);
+  }, [selectedDistrict, selectedDistrictState]);
 
   // ── District mode ─────────────────────────────────────────────
   if (selectedDistrict && districtResult && districtClaims.length > 0) {
@@ -309,7 +314,7 @@ export function Dashboard({
       .slice(0, 3);
 
     return (
-      <section className="flex flex-col gap-md overflow-y-auto rounded-lg border border-hairline bg-surface-1 p-md lg:max-h-[calc(100vh-3.5rem-4rem)]">
+      <section className="flex flex-col gap-md overflow-y-auto rounded-lg border border-hairline bg-surface-1 p-md lg:max-h-[calc(100vh-4rem)]">
         <header className="flex items-start justify-between gap-sm">
           <div>
             <h2 className="text-sm font-medium text-ink">{selectedDistrict}</h2>
@@ -419,6 +424,16 @@ export function Dashboard({
   // ── State mode ────────────────────────────────────────────────
   if (selectedState) {
     const stat = stateStat;
+    // Census-2011 names for the selected map state — synthetic claims and
+    // district results carry the census spelling.
+    const stateCensusNames = censusStatesFor(selectedState.properties.ST_NM);
+    const stateClaims = (claims as Claim[]).filter((c) =>
+      stateCensusNames.includes(c.location.state),
+    );
+    const syntheticDistricts = engineOutput.districts.filter((d) =>
+      stateCensusNames.includes(d.state),
+    );
+
     const counts = stat
       ? {
           received: stat.claimsReceived,
@@ -427,65 +442,82 @@ export function Dashboard({
           pending: stat.pending,
           settled: stat.titlesGranted + stat.rejected,
         }
-      : null;
-    const statusData = counts
-      ? [
-          { name: "Received", value: counts.received, fill: BRAND },
-          { name: "Titles", value: counts.titleIssued, fill: RISK_LOW },
-          { name: "Rejected", value: counts.rejected, fill: RISK_HIGH },
-          { name: "Pending", value: counts.pending, fill: RISK_WATCH },
-        ]
-      : [];
-
-    const syntheticDistricts = engineOutput.districts.filter(
-      (d) => d.state === selectedState.properties.ST_NM,
-    );
+      : (() => {
+          let titleIssued = 0;
+          let rejected = 0;
+          let pending = 0;
+          for (const c of stateClaims) {
+            if (c.status === "titleIssued") titleIssued++;
+            else if (c.status === "rejected") rejected++;
+            else pending++;
+          }
+          return {
+            received: stateClaims.length,
+            titleIssued,
+            rejected,
+            pending,
+            settled: titleIssued + rejected,
+          };
+        })();
+    const statusData = [
+      { name: "Received", value: counts.received, fill: BRAND },
+      { name: "Titles", value: counts.titleIssued, fill: RISK_LOW },
+      { name: "Rejected", value: counts.rejected, fill: RISK_HIGH },
+      { name: "Pending", value: counts.pending, fill: RISK_WATCH },
+    ];
+    const medianDays = stat ? null : medianProcessingDays(stateClaims);
+    const highRisk = stat
+      ? null
+      : syntheticDistricts.reduce(
+          (n, d) =>
+            n + d.claimResults.filter((r) => r.riskScore >= 0.55).length,
+          0,
+        );
 
     return (
-      <section className="flex flex-col gap-md overflow-y-auto rounded-lg border border-hairline bg-surface-1 p-md lg:max-h-[calc(100vh-3.5rem-4rem)]">
+      <section className="flex flex-col gap-md overflow-y-auto rounded-lg border border-hairline bg-surface-1 p-md lg:max-h-[calc(100vh-4rem)]">
         <header className="flex items-start justify-between gap-sm">
           <div>
             <h2 className="text-sm font-medium text-ink">
               {selectedState.properties.ST_NM}
             </h2>
             <p className="text-xs text-ink-subtle">
-              Official state data · MoTA, 30 Jun 2026
+              {stat
+                ? "Official state data · MoTA, 30 Jun 2026"
+                : "Synthetic demo data · generated claims"}
             </p>
           </div>
+          {!stat && <SyntheticBadge />}
         </header>
 
-        {counts ? (
-          <>
-            <div className="grid grid-cols-2 gap-sm">
-              <KpiCard label="Received" value={formatCount(counts.received)} />
-              <KpiCard label="Settled" value={formatCount(counts.settled)} />
-              <KpiCard label="Pending" value={formatCount(counts.pending)} />
-              <KpiCard
-                label="Approval rate"
-                value={formatPct(counts.titleIssued, counts.settled)}
-              />
-              <KpiCard label="Median processing time" value="—" />
-              <KpiCard label="High-risk claims" value="—" />
-            </div>
+        <div className="grid grid-cols-2 gap-sm">
+          <KpiCard label="Received" value={formatCount(counts.received)} />
+          <KpiCard label="Settled" value={formatCount(counts.settled)} />
+          <KpiCard label="Pending" value={formatCount(counts.pending)} />
+          <KpiCard
+            label="Approval rate"
+            value={formatPct(counts.titleIssued, counts.settled)}
+          />
+          <KpiCard
+            label="Median processing time"
+            value={medianDays === null ? "—" : `${medianDays} days`}
+          />
+          <KpiCard
+            label="High-risk claims"
+            value={highRisk === null ? "—" : formatCount(highRisk)}
+          />
+        </div>
 
-            <Panel title="Status distribution" phase="Received vs outcome">
-              <StatusChart data={statusData} />
-            </Panel>
-          </>
-        ) : (
-          <div className="rounded-md border border-dashed border-hairline bg-canvas p-md text-center">
-            <p className="text-sm text-ink-subtle">
-              No official figures available for this state.
-            </p>
-          </div>
-        )}
+        <Panel title="Status distribution" phase="Received vs outcome">
+          <StatusChart data={statusData} />
+        </Panel>
 
         <Panel title="What's unusual here" phase="District-level signals">
           {syntheticDistricts.length > 0 ? (
             <ul className="space-y-sm">
               {syntheticDistricts.map((d) => (
                 <li
-                  key={d.district}
+                  key={`${d.state}::${d.district}`}
                   className="flex items-center justify-between gap-2 rounded-md border border-hairline bg-surface-2 p-sm"
                 >
                   <div>
@@ -513,8 +545,7 @@ export function Dashboard({
           ) : (
             <div className="space-y-2">
               <p className="text-sm text-ink-subtle">
-                District-level anomaly data is available for Madhya Pradesh —
-                select it to drill down.
+                No district-level data for this state yet.
               </p>
               <SyntheticBadge />
             </div>
@@ -542,7 +573,7 @@ export function Dashboard({
   const topDistricts = engineOutput.districts.slice(0, 6);
 
   return (
-    <section className="flex flex-col gap-md overflow-y-auto rounded-lg border border-hairline bg-surface-1 p-md lg:max-h-[calc(100vh-3.5rem-4rem)]">
+    <section className="flex flex-col gap-md overflow-y-auto rounded-lg border border-hairline bg-surface-1 p-md lg:max-h-[calc(100vh-4rem)]">
       <header className="flex items-start justify-between gap-sm">
         <div>
           <h2 className="text-sm font-medium text-ink">National overview</h2>
@@ -575,7 +606,7 @@ export function Dashboard({
         <ul className="space-y-sm">
           {topDistricts.map((d) => (
             <li
-              key={d.district}
+              key={`${d.state}::${d.district}`}
               className="flex items-center justify-between gap-2 rounded-md border border-hairline bg-surface-2 p-sm"
             >
               <div>

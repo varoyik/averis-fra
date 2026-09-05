@@ -418,7 +418,7 @@ import { riskColor, districtRisk } from "../analytics/score";
 - [x] Prompt contract (below) baked into the function — the guardrails live in the prompt
 - [x] Validate the AI's JSON with zod; on failure → deterministic **template fallback** (renders the same `Factor[]` as plain sentences) so the demo can never die on the AI
 - [x] `vercel.json` with SPA rewrites + the function route (below)
-- [ ] Deploy + test from the live URL once
+- [x] Deploy + test from the live URL once
 
 ```ts
 // api/investigate.ts — the ONLY server-side code in the project
@@ -481,11 +481,11 @@ export default async function handler(req: Request) {
 
 **What:** Lock the demo path and walk the gate. From now on, nothing may break this flow.
 
-- [ ] Fix the hero district + hero claim (scenario E) as the demo's drill-down target — commit its claimId in a `demo.ts` constants file
-- [ ] Walk all 7 gate steps (below) start-to-finish in the built app — no console, no manual data edits
-- [ ] "Demo data — synthetic" labels visible on every screen (guardrail)
+- [x] Fix the hero district + hero claim (scenario E) as the demo's drill-down target — commit its claimId in a `demo.ts` constants file
+- [x] Walk all 7 gate steps (below) start-to-finish in the built app — no console, no manual data edits
+- [x] "Demo data — synthetic" labels visible on every screen (guardrail)
 - [ ] Verify the AI narrative renders on live deploy; if it fails, template fallback still renders
-- [ ] Fix the top 3 visual jank items found during the walkthrough
+- [x] Fix the top 3 visual jank items found during the walkthrough
 
 ---
 

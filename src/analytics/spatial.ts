@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { Claim, Factor } from "../lib/types";
+import { districtKey } from "../lib/geo";
 
 const GRID_SIZE = 0.25; // degrees
 
@@ -32,10 +33,10 @@ function percentile(sorted: number[], p: number): number {
 // ── Main export ───────────────────────────────────────────────
 // Returns a map of claimId → Factor | null.
 export function detectSpatialAnomalies(
-  claims: Claim[]
+  claims: Claim[],
 ): Map<string, Factor | null> {
   const result = new Map<string, Factor | null>(
-    claims.map((c) => [c.claimId, null])
+    claims.map((c) => [c.claimId, null]),
   );
 
   // Claims without geo coords can't be spatially analysed
@@ -51,7 +52,9 @@ export function detectSpatialAnomalies(
   }
 
   // 2. Sorted cell counts for percentile calculation
-  const counts = [...cellMap.values()].map((arr) => arr.length).sort((a, b) => a - b);
+  const counts = [...cellMap.values()]
+    .map((arr) => arr.length)
+    .sort((a, b) => a - b);
   const topDecileThreshold = percentile(counts, 90);
 
   // 3. Flag claims in top-decile cells
@@ -70,7 +73,7 @@ export function detectSpatialAnomalies(
       result.set(claim.claimId, {
         key: "spatial",
         label: "Unusual geographic concentration of claims",
-        weight: 0.20,
+        weight: 0.2,
         score: Math.round(Math.min(rawScore, 1) * 100) / 100,
         detail: `${count} claims in grid cell ${cell} (top-decile threshold: ${topDecileThreshold})`,
       });
@@ -82,27 +85,42 @@ export function detectSpatialAnomalies(
 
 // ── District anomaly density ranking ─────────────────────────
 // Used to colour the choropleth map. Returns districts sorted
-// by (flaggedClaims / totalClaims) descending.
+// by (flaggedClaims / totalClaims) descending. Keyed by
+// (state, district) so shared district names stay separate.
 export function rankDistrictsByDensity(
   claims: Claim[],
-  spatialFlags: Map<string, Factor | null>
-): Array<{ district: string; density: number; flagged: number; total: number }> {
+  spatialFlags: Map<string, Factor | null>,
+): Array<{
+  district: string;
+  state: string;
+  density: number;
+  flagged: number;
+  total: number;
+}> {
   const byDistrict = new Map<
     string,
-    { flagged: number; total: number }
+    { district: string; state: string; flagged: number; total: number }
   >();
 
   for (const c of claims) {
-    const d = c.location.district;
-    if (!byDistrict.has(d)) byDistrict.set(d, { flagged: 0, total: 0 });
-    const entry = byDistrict.get(d)!;
+    const key = districtKey(c.location.state, c.location.district);
+    if (!byDistrict.has(key)) {
+      byDistrict.set(key, {
+        district: c.location.district,
+        state: c.location.state,
+        flagged: 0,
+        total: 0,
+      });
+    }
+    const entry = byDistrict.get(key)!;
     entry.total += 1;
     if (spatialFlags.get(c.claimId)) entry.flagged += 1;
   }
 
-  return [...byDistrict.entries()]
-    .map(([district, { flagged, total }]) => ({
+  return [...byDistrict.values()]
+    .map(({ district, state, flagged, total }) => ({
       district,
+      state,
       density: total > 0 ? flagged / total : 0,
       flagged,
       total,

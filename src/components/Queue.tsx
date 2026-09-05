@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import claimsRaw from "../../data/generated/claims.json";
 import type { Claim, ClaimResult } from "../lib/types";
 import { runEngine, riskBand } from "../analytics";
+import { districtKey } from "../lib/geo";
+import { HERO_DISTRICT, HERO_STATE } from "../lib/demo";
 
 // ── Props ─────────────────────────────────────────────────────
 // Person A wires onSelectClaim when Investigation workspace (1.5)
@@ -46,21 +48,24 @@ export function Queue({ onSelectClaim }: QueueProps = {}) {
     };
   }, []);
 
-  // Hero district = district of the top-ranked claim (no hardcoded names)
-  const heroDistrict = useMemo(() => {
-    const top = topClaims[0];
-    return top ? claimMap.get(top.claimId)?.location.district : undefined;
-  }, [topClaims, claimMap]);
+  // Hero district = the locked demo drill-down target (ROADMAP 1.8)
+  const heroDistrict = HERO_DISTRICT;
 
   // ── District filter state (Roadmap: rank districts, within hero rank claims)
   const [selectedDistrict, setSelectedDistrict] = useState<string>("all");
 
   // ── Filtered claims based on selected district ─────────────────
+  // The dropdown value is the (state, district) composite key, so
+  // districts that share a name across states stay distinct.
   const filteredClaims = useMemo(() => {
     if (selectedDistrict === "all") return topClaims;
-    return topClaims.filter(
-      (cr) => claimMap.get(cr.claimId)?.location.district === selectedDistrict,
-    );
+    return topClaims.filter((cr) => {
+      const loc = claimMap.get(cr.claimId)?.location;
+      return (
+        loc !== undefined &&
+        districtKey(loc.state, loc.district) === selectedDistrict
+      );
+    });
   }, [topClaims, claimMap, selectedDistrict]);
 
   // ── Pagination state ──────────────────────────────────────────
@@ -99,12 +104,17 @@ export function Queue({ onSelectClaim }: QueueProps = {}) {
             className="w-full appearance-none truncate rounded-md border border-hairline bg-surface-2 py-1 pl-xs pr-6 text-xs text-ink focus:border-brand focus:outline-none"
           >
             <option value="all">All districts ({topClaims.length})</option>
-            {districts.map((d) => (
-              <option key={d.district} value={d.district}>
-                {d.district} {d.district === heroDistrict ? "★" : ""} ·{" "}
-                {(d.riskScore * 100).toFixed(0)}% risk ({d.anomalyCount})
-              </option>
-            ))}
+            {districts.map((d) => {
+              const key = districtKey(d.state, d.district);
+              const isHero =
+                d.district === heroDistrict && d.state === HERO_STATE;
+              return (
+                <option key={key} value={key}>
+                  {d.district} · {d.state} {isHero ? "★" : ""} ·{" "}
+                  {(d.riskScore * 100).toFixed(0)}% risk ({d.anomalyCount})
+                </option>
+              );
+            })}
           </select>
           <svg
             className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-ink-subtle"
@@ -178,7 +188,8 @@ export function Queue({ onSelectClaim }: QueueProps = {}) {
 
               {/* Location / ID */}
               <p className="mt-0.5 truncate text-xs text-ink-subtle">
-                {claim.location.village}, {claim.location.district}
+                {claim.location.village}, {claim.location.district},{" "}
+                {claim.location.state}
                 {" · "}
                 <span className="text-ink-tertiary">{claim.claimId}</span>
               </p>

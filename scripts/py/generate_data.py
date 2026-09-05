@@ -3,13 +3,20 @@ generate_data.py
 ────────────────
 Synthetic FRA claim data generator for the Averis-FRA demo.
 
-Run:   python scripts/py/generate_data.py
-Output: data/generated/claims.json  (~510 claims, ~200 KB)
+Run:   python3 scripts/py/generate_data.py
+Output: data/generated/claims.json  (~5,800 claims, ~5 MB)
 
 Rules:
   • Seeded with random.Random(1337) — every run is identical.
   • Pure stdlib — no pip install needed.
   • Output field names match the Claim TypeScript interface EXACTLY.
+  • Covers ALL 35 Census-2011 states. Madhya Pradesh runs FIRST and exactly
+    as the original single-state generator (scenarios A–E, same districts,
+    same rng order, MP claim IDs + hero MP-DIN-HERO-001), so MP values stay
+    byte-stable. The other 34 states are generated afterwards from
+    data/districts.geojson: districts picked per state (sorted + rng.shuffle
+    of a copy, min(8, len)), centroids computed from geometry (shoelace),
+    and location.state = the exact geojson ST_NM string.
   • Five scenarios embedded: A (bottleneck) · B (mismatch) · C (duplicates)
     D (spatial cluster) · E (hero claim with all signals).
 
@@ -29,6 +36,7 @@ rng = random.Random(1337)
 # ── Output path ──────────────────────────────────────────────────────────────
 OUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "data", "generated")
 OUT_FILE = os.path.join(OUT_DIR, "claims.json")
+GEOJSON_FILE = os.path.normpath(os.path.join(OUT_DIR, "..", "districts.geojson"))
 
 # ── Demo state ───────────────────────────────────────────────────────────────
 STATE = "Madhya Pradesh"
@@ -75,6 +83,16 @@ VILLAGES = [
     "Pushparajgarh", "Pali", "Kotma", "Dhanpuri", "Sohagpur",
     "Umaria", "Chandla", "Singhpur", "Majhgaon", "Birsa",
 ]
+# Extended generic pool for the non-MP states. VILLAGES itself stays untouched
+# so the MP block's rng draws and village picks remain byte-identical.
+VILLAGES_EXT = [
+    "Amarpur", "Balrampur", "Chandpur", "Deoghar", "Ekta", "Faridpur",
+    "Gopalpur", "Haripur", "Islampur", "Jagatpur", "Kheri", "Lodha",
+    "Madhupur", "Nagla", "Obra", "Paharpur", "Qazipur", "Raghunathpur",
+    "Sakti", "Tarapur", "Umri", "Vellalur", "Wadgaon", "Yamunapur",
+    "Zindapur", "Baramati", "Dharampur", "Ranipur", "Nandpur", "Malpur",
+]
+VILLAGES_ALL = VILLAGES + VILLAGES_EXT
 FOREST_RANGES = [
     "Mandla Range", "Dindori Range", "Balaghat Range", "Shahdol Range",
     "Seoni Range", "Tamia Range", "Bichhia Range", "Beohari Range",
@@ -94,6 +112,53 @@ TEHSILS = {
     "Umaria":      ["Umaria", "Pali", "Chandia"],
 }
 GP_SUFFIXES = ["Gram Panchayat", "GP", "Panchayat"]
+
+# ── All-states generation (34 census states; MP handled by the block above) ──
+# Short state codes for claim IDs; MP keeps its own "MP-..." IDs.
+STATE_CODES = {
+    "Andaman & Nicobar Island": "AN",
+    "Andhra Pradesh": "AP",
+    "Arunanchal Pradesh": "AR",
+    "Assam": "AS",
+    "Bihar": "BR",
+    "Chandigarh": "CH",
+    "Chhattisgarh": "CT",
+    "Dadara & Nagar Havelli": "DN",
+    "Daman & Diu": "DD",
+    "Goa": "GA",
+    "Gujarat": "GJ",
+    "Haryana": "HR",
+    "Himachal Pradesh": "HP",
+    "Jammu & Kashmir": "JK",
+    "Jharkhand": "JH",
+    "Karnataka": "KA",
+    "Kerala": "KL",
+    "Lakshadweep": "LD",
+    "Madhya Pradesh": "MP",  # reference only — the MP block above keeps its own IDs
+    "Maharashtra": "MH",
+    "Manipur": "MN",
+    "Meghalaya": "ML",
+    "Mizoram": "MZ",
+    "NCT of Delhi": "DL",
+    "Nagaland": "NL",
+    "Odisha": "OR",
+    "Puducherry": "PY",
+    "Punjab": "PB",
+    "Rajasthan": "RJ",
+    "Sikkim": "SK",
+    "Tamil Nadu": "TN",
+    "Tripura": "TR",
+    "Uttar Pradesh": "UP",
+    "Uttarakhand": "UK",
+    "West Bengal": "WB",
+}
+
+# scenario sizes per non-MP state
+BOTTLENECK_COUNT = 13  # scenario A (first picked district)
+CLUSTER_COUNT    = 10  # scenario D (second picked district)
+MISMATCH_COUNT   = 9   # scenario B (scattered across the state)
+DUP_PAIRS        = 3   # scenario C (3 pairs = 6 claims)
+DISTRICT_TARGET  = 24  # fill target per district (totals stay in [20, 28])
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def rand_date(start_year: int, end_year: int) -> date:
@@ -190,6 +255,11 @@ def make_claim(
     base_lat: float,
     base_lon: float,
     *,
+    state=None,
+    tehsils=None,
+    village_pool=None,
+    forest_ranges=None,
+    receipt_years=None,
     status_override=None,
     area_mismatch=False,
     bottleneck=False,
@@ -225,14 +295,15 @@ def make_claim(
         area_record = round(area_claimed * rng.uniform(0.93, 1.07), 2)
 
     occupancy = rand_date(1970, 2005)
-    receipt   = rand_date(2018, 2024)
+    ry        = receipt_years if receipt_years is not None else (2018, 2024)
+    receipt   = rand_date(*ry)
     if receipt <= occupancy:
         receipt = occupancy + timedelta(days=365 * 13)
 
-    tehsil   = pick(TEHSILS[district])
-    village  = pick(VILLAGES)
+    tehsil   = pick(tehsils if tehsils is not None else TEHSILS[district])
+    village  = pick(village_pool if village_pool is not None else VILLAGES)
     gp       = f"{village} {pick(GP_SUFFIXES)}"
-    fr_range = pick(FOREST_RANGES)
+    fr_range = pick(forest_ranges if forest_ranges is not None else FOREST_RANGES)
 
     # Stages and status
     if status_override:
@@ -304,7 +375,7 @@ def make_claim(
             "category": cat,
         },
         "location": {
-            "state": STATE,
+            "state": state if state is not None else STATE,
             "district": district,
             "tehsil": tehsil,
             "gramPanchayat": gp,
@@ -448,7 +519,157 @@ def generate() -> list:
 
     # Shuffle so scenarios aren't all at the top
     rng.shuffle(claims)
+
+    # ── Other states — all 34 census states except Madhya Pradesh ──
+    generate_other_states(claims)
+
+    # Final mix so all states are interleaved
+    rng.shuffle(claims)
     return claims
+
+def centroid_from_geometry(geom) -> tuple:
+    """
+    Approx centroid of a Polygon/MultiPolygon feature.
+    Polygon -> largest ring; MultiPolygon -> polygon with the largest ring.
+    Shoelace formula over the ring; returns (lat, lon). Rings are [lon, lat].
+    """
+    if geom["type"] == "Polygon":
+        ring = max(geom["coordinates"], key=len)
+    else:  # MultiPolygon
+        best_ring, best_len = None, -1
+        for poly in geom["coordinates"]:
+            for r in poly:
+                if len(r) > best_len:
+                    best_ring, best_len = r, len(r)
+        ring = best_ring
+    n = len(ring)
+    if n < 3:
+        return ring[0][1], ring[0][0]
+    area2 = 0.0
+    cx = 0.0
+    cy = 0.0
+    for i in range(n):
+        x1, y1 = ring[i]
+        x2, y2 = ring[(i + 1) % n]
+        cross = x1 * y2 - x2 * y1
+        area2 += cross
+        cx += (x1 + x2) * cross
+        cy += (y1 + y2) * cross
+    if abs(area2) < 1e-12:
+        return ring[0][1], ring[0][0]
+    return cy / (3 * area2), cx / (3 * area2)  # (lat, lon)
+
+
+def generate_other_states(claims: list) -> None:
+    """Append claims for every census state except Madhya Pradesh."""
+    with open(GEOJSON_FILE, encoding="utf-8") as f:
+        gj = json.load(f)
+
+    by_state = {}
+    for feat in gj["features"]:
+        by_state.setdefault(feat["properties"]["ST_NM"], []).append(feat)
+
+    # Every MP claimId (incl. MP-DIN-HERO-*) is already in `claims`.
+    seen_ids = {c["claimId"] for c in claims}
+
+    for state in sorted(n for n in by_state if n != STATE):
+        feats = by_state[state]
+        code = STATE_CODES[state]
+
+        # Seeded district pick: sorted names, shuffle a COPY, take min(8, len)
+        names = sorted(f["properties"]["DISTRICT"] for f in feats)
+        order = names[:]
+        rng.shuffle(order)
+        picked = order[: min(8, len(order))]
+        picked_set = set(picked)
+
+        centroids = {}
+        for f in feats:
+            nm = f["properties"]["DISTRICT"]
+            if nm in picked_set:
+                centroids[nm] = centroid_from_geometry(f["geometry"])
+
+        counters = {d: 0 for d in picked}
+        dist_counts = {d: 0 for d in picked}
+        tehsils_map = {d: [d, f"{d} North", f"{d} South"] for d in picked}
+        ranges_map = {d: [f"{d} Range", "State Forest Range"] for d in picked}
+
+        def next_id(district: str) -> str:
+            counters[district] += 1
+            base = f"{code}-{district[:3].upper()}-{counters[district]:04d}"
+            cid = base
+            n = 2
+            while cid in seen_ids:
+                cid = f"{base}-{n}"
+                n += 1
+            seen_ids.add(cid)
+            return cid
+
+        def add(c: dict) -> None:
+            claims.append(c)
+            dist_counts[c["location"]["district"]] += 1
+
+        def mk(district: str, **kw) -> dict:
+            lat, lon = centroids[district]
+            return make_claim(
+                next_id(district), district, lat, lon,
+                state=state,
+                tehsils=tehsils_map[district],
+                village_pool=VILLAGES_ALL,
+                forest_ranges=ranges_map[district],
+                **kw,
+            )
+
+        # (a) Scenario A — bottleneck district (first picked), ~13 claims.
+        #     Narrower receipt window keeps DLC dates inside the validator
+        #     range even with the forced 400-700 day DLC stage.
+        bot = picked[0]
+        for _ in range(BOTTLENECK_COUNT):
+            c = mk(bot, bottleneck=True, status_override="pending",
+                   receipt_years=(2018, 2022))
+            # Mirror the MP logic: force dlcDecision present
+            stages = c["stages"]
+            if "sdlcDecision" in stages and "dlcDecision" not in stages:
+                sdlc_d = date.fromisoformat(stages["sdlcDecision"])
+                stages["dlcDecision"] = iso(
+                    sdlc_d + timedelta(days=rng.randint(400, 700))
+                )
+            add(c)
+
+        # (b) Scenario D — tight ±0.025° cluster in the second picked district
+        if len(picked) >= 2:
+            clu = picked[1]
+            centre = (centroids[clu][0] + 0.05, centroids[clu][1] + 0.05)
+            for _ in range(CLUSTER_COUNT):
+                add(mk(clu, cluster_geo=True, cluster_centre=centre))
+
+        # (c) Scenario B — area-mismatch claims scattered across the state
+        for i in range(MISMATCH_COUNT):
+            dist = picked[i % len(picked)]
+            add(mk(dist, area_mismatch=True))
+
+        # (d) Scenario C — duplicate pairs (same village + khasra, drifted name)
+        for pair_idx in range(DUP_PAIRS):
+            dist = picked[(pair_idx * 2) % len(picked)]
+            shared_khasra = khasra()
+            shared_village = pick(VILLAGES_ALL)
+            orig = mk(dist)
+            orig["land"]["khasraNo"] = shared_khasra
+            orig["location"]["village"] = shared_village
+            orig["location"]["gramPanchayat"] = f"{shared_village} {pick(GP_SUFFIXES)}"
+            add(orig)
+            clone = mk(dist)
+            clone["land"]["khasraNo"] = shared_khasra
+            clone["location"]["village"] = shared_village
+            clone["location"]["gramPanchayat"] = orig["location"]["gramPanchayat"]
+            clone["claimant"]["name"] = drift_spelling(orig["claimant"]["name"])
+            add(clone)
+
+        # (e) Fill each district to DISTRICT_TARGET total claims
+        for dist in picked:
+            fill = max(0, DISTRICT_TARGET - dist_counts[dist])
+            for _ in range(fill):
+                add(mk(dist))
 
 
 def main():
@@ -460,9 +681,19 @@ def main():
 
     # Quick sanity
     districts = {c["location"]["district"] for c in claims}
-    print(f"    Districts: {sorted(districts)}")
+    print(f"    Districts ({len(districts)}): {sorted(districts)}")
     hero = next((c for c in claims if c["claimId"] == "MP-DIN-HERO-001"), None)
     print(f"    Hero claim: {'found' if hero else 'MISSING'}")
+
+    # Per-state coverage summary
+    by_state = {}
+    for c in claims:
+        by_state.setdefault(c["location"]["state"], set()).add(
+            c["location"]["district"]
+        )
+    print(f"    States covered: {len(by_state)}")
+    for st in sorted(by_state):
+        print(f"      {st}: {len(by_state[st])} districts")
 
 
 if __name__ == "__main__":
